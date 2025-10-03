@@ -3,7 +3,7 @@
     {
       "id": "earth-texture",
       "description": "A texture map of the Earth.",
-      "imageUrl": "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxlYXJ0aCUyMG1hcHxlbnwwfHx8fDE3NTk0NTA1MzB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg",
       "imageHint": "earth map"
     }
   ]

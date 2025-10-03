@@ -1,18 +1,20 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { Location, EnvironmentalData, AIInsights } from "@/lib/types";
+import type { Location, EnvironmentalData, AIInsights, SatelliteData } from "@/lib/types";
 import { getLocationData } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 
 import Header from "@/components/layout/Header";
 import EarthGlobe from "@/components/globe/EarthGlobe";
 import Dashboard from "@/components/dashboard/Dashboard";
+import { TerraDataPanel } from "@/components/dashboard/TerraDataPanel";
 
 export default function Home() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [data, setData] = useState<(EnvironmentalData & AIInsights) | null>(null);
   const [loading, setLoading] = useState(false);
+  const [terraData, setTerraData] = useState<SatelliteData | null>(null);
   const { toast } = useToast();
 
   const handleLocationSelect = useCallback(async (location: Location) => {
@@ -47,13 +49,18 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       <Header onSearch={handleLocationSelect} />
-      <main className="flex-1 grid md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 overflow-hidden">
+      <main className="flex-1 grid md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 overflow-hidden relative">
         <div className="lg:col-span-2 h-full min-h-[300px] md:min-h-0 rounded-lg overflow-hidden border shadow-md">
-          <EarthGlobe onLocationSelect={handleLocationSelect} markerCoordinates={selectedLocation} />
+          <EarthGlobe 
+            onLocationSelect={handleLocationSelect} 
+            markerCoordinates={selectedLocation}
+            onSatelliteUpdate={setTerraData}
+          />
         </div>
         <div className="lg:col-span-3 h-full overflow-y-auto rounded-lg custom-scrollbar">
           <Dashboard data={data} loading={loading} selectedLocation={selectedLocation} />
         </div>
+        {terraData && <TerraDataPanel data={terraData} />}
       </main>
     </div>
   );
