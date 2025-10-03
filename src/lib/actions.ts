@@ -137,11 +137,11 @@ function extractPowerValue(
   powerData: NasaPowerResponse | null,
   param: string,
   dateKey: string,
-  fallback: () => number
+  fallback: number
 ): number {
   try {
     if (!powerData?.properties?.parameter?.[param]?.[dateKey]) {
-      return parseFloat(fallback().toFixed(2));
+      return parseFloat(fallback.toFixed(2));
     }
     
     const value = powerData.properties.parameter[param][dateKey];
@@ -154,7 +154,7 @@ function extractPowerValue(
     console.error(`Error extracting power value for ${param}:`, error);
   }
   
-  return parseFloat(fallback().toFixed(2));
+  return parseFloat(fallback.toFixed(2));
 }
 
 // Main function to fetch environmental data
@@ -177,7 +177,7 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
     nasaData,
     'TS_DAY_MODIS',
     todayKey,
-    () => CONSTANTS.DEFAULT_TEMPERATURE + Math.random() * 10
+    CONSTANTS.DEFAULT_TEMPERATURE
   );
 
   const forecast = Array.from({ length: CONSTANTS.FORECAST_DAYS }, (_, index) => {
@@ -187,23 +187,23 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
 
     return {
       day: day.toLocaleDateString('en-US', { weekday: 'short' }),
-      temp: extractPowerValue(nasaData, 'TS_DAY_MODIS', key, () => currentTemp + Math.random() * 4 - 2),
-      max: extractPowerValue(nasaData, 'T2M_MAX', key, () => currentTemp + 5),
-      min: extractPowerValue(nasaData, 'T2M_MIN', key, () => currentTemp - 5),
+      temp: extractPowerValue(nasaData, 'TS_DAY_MODIS', key, currentTemp),
+      max: extractPowerValue(nasaData, 'T2M_MAX', key, currentTemp + 5),
+      min: extractPowerValue(nasaData, 'T2M_MIN', key, currentTemp - 5),
       condition: 'Varies',
     };
   });
 
   const avgPrecip = dateKeys.length > 0
-    ? dateKeys.map(key => extractPowerValue(nasaData, 'PRECTOTCORR', key, () => 0)).reduce((a, b) => a + b, 0) / dateKeys.length
-    : Math.random() * 10;
+    ? dateKeys.map(key => extractPowerValue(nasaData, 'PRECTOTCORR', key, 0)).reduce((a, b) => a + b, 0) / dateKeys.length
+    : 0.1;
 
-  const soilMoisture = avgPrecip > 1 ? Math.random() * 0.5 + 0.2 : Math.random() * 0.3;
-  const ndvi = extractPowerValue(nasaData, 'NDVI_MODIS', todayKey, () => Math.min(0.9, Math.max(0.1, soilMoisture * 1.2)));
+  const soilMoisture = avgPrecip > 1 ? 0.6 : 0.3;
+  const ndvi = extractPowerValue(nasaData, 'NDVI_MODIS', todayKey, soilMoisture * 1.2);
 
   const airQuality: AirQualityData = {
-    aerosolIndex: extractPowerValue(nasaData, 'AOD_550_MISR', todayKey, () => Math.random() * 0.5),
-    co: extractPowerValue(nasaData, 'CO_COLUMN_MOPITT', todayKey, () => Math.random() * 0.05),
+    aerosolIndex: extractPowerValue(nasaData, 'AOD_550_MISR', todayKey, 0.2),
+    co: extractPowerValue(nasaData, 'CO_COLUMN_MOPITT', todayKey, 0.02),
   };
 
   return {
@@ -212,10 +212,10 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
     soil: {
       moisture: parseFloat(soilMoisture.toFixed(2)),
       temperature: currentTemp,
-      ph: parseFloat((5.5 + Math.random() * 2).toFixed(2)),
-      nitrogen: parseFloat((10 + soilMoisture * 40).toFixed(2)),
-      phosphorus: parseFloat((5 + soilMoisture * 20).toFixed(2)),
-      potassium: parseFloat((20 + soilMoisture * 50).toFixed(2)),
+      ph: parseFloat((6.5).toFixed(2)),
+      nitrogen: parseFloat((15).toFixed(2)),
+      phosphorus: parseFloat((8).toFixed(2)),
+      potassium: parseFloat((25).toFixed(2)),
     },
     fire: fireInfo,
     water: {
