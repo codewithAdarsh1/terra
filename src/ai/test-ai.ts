@@ -5,7 +5,7 @@ import { z } from 'genkit';
 
 const testPrompt = ai.definePrompt({
   name: 'testPrompt',
-  model: 'googleai/gemini-1.5-pro-latest',
+  model: 'groq/llama3-70b-8192',
   input: { schema: z.object({ text: z.string() }) },
   output: { schema: z.object({ response: z.string() }) },
   prompt: 'Say hello to {{text}}',

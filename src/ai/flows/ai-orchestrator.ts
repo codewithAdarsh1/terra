@@ -56,7 +56,6 @@ const orchestratorFlow = ai.defineFlow(
     
     console.log('🚀 Starting AI Orchestrator for location:', environmentalData.location.name);
     
-    // Call all AI flows in parallel
     const aiCalls = [
       futureTrendPredictions(environmentalData),
       getCropRecommendations(environmentalData),
@@ -96,22 +95,22 @@ const orchestratorFlow = ai.defineFlow(
       summary,
       futurePredictions: predictionsResult.status === 'fulfilled' 
           ? predictionsResult.value.predictions 
-          : `Error: ${predictionsResult.status === 'rejected' ? predictionsResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
+          : 'Unable to generate future predictions at this time. Please try again.',
       cropRecommendations: cropRecommendationsResult.status === 'fulfilled' 
           ? cropRecommendationsResult.value.cropRecommendations 
-          : `Error: ${cropRecommendationsResult.status === 'rejected' ? cropRecommendationsResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
+          : 'Unable to generate crop recommendations at this time. Please try again.',
       riskAssessment: riskAssessmentResult.status === 'fulfilled' 
           ? riskAssessmentResult.value.riskAssessment 
-          : `Error: ${riskAssessmentResult.status === 'rejected' ? riskAssessmentResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
+          : 'Unable to assess environmental risks at this time. Please try again.',
       simplifiedExplanation: simplifiedExplanationResult.status === 'fulfilled' 
           ? simplifiedExplanationResult.value.simplifiedExplanation 
-          : `Error: ${simplifiedExplanationResult.status === 'rejected' ? simplifiedExplanationResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
+          : `Environmental conditions at ${environmentalData.location.name} are being analyzed.`,
       environmentalSolutions: environmentalSolutionsResult.status === 'fulfilled' 
           ? environmentalSolutionsResult.value.solutions 
-          : `Error: ${environmentalSolutionsResult.status === 'rejected' ? environmentalSolutionsResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
+          : 'Unable to generate environmental solutions at this time. Please try again.',
       healthAdvisory: healthResult.status === 'fulfilled' 
           ? healthResult.value.healthAdvisory 
-          : `Error: ${healthResult.status === 'rejected' ? healthResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
+          : 'Unable to generate health advisory at this time. Please try again.',
     };
 
     console.log('🎉 AI Orchestrator completed');
