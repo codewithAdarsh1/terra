@@ -16,12 +16,12 @@ import {z} from 'genkit';
 // Define the input schema for the flow
 const SimplifiedExplanationInputSchema = z.object({
   location: z.string().describe('The location for which the environmental data is being requested.'),
-  airQuality: z.string().describe('Air quality data for the specified location.'),
+  airQuality: z.string().describe('Air quality data (Aerosol Index, CO) for the specified location.'),
   soilData: z.string().describe('Soil data for the specified location.'),
   fireDetection: z.string().describe('Fire detection data for the specified location.'),
   waterResources: z.string().describe('Water resources data for the specified location.'),
-  weatherPatterns: z.string().describe('Weather patterns data for the specified location.'),
-  temperature: z.string().describe('Temperature data for the specified location.'),
+  weatherPatterns: z.string().describe('Weather patterns for the specified location.'),
+  temperature: z.string().describe('Surface temperature data for the specified location.'),
   additionalMetrics: z.string().describe('Additional environmental metrics for the specified location.'),
 });
 export type SimplifiedExplanationInput = z.infer<typeof SimplifiedExplanationInputSchema>;
@@ -37,18 +37,18 @@ const simplifiedExplanationPrompt = ai.definePrompt({
   name: 'simplifiedExplanationPrompt',
   input: {schema: SimplifiedExplanationInputSchema},
   output: {schema: SimplifiedExplanationOutputSchema},
-  prompt: `You are an AI assistant that specializes in simplifying complex environmental data for the average person.
+  prompt: `You are an AI assistant that specializes in simplifying complex environmental data from NASA's Terra satellite for the average person.
 
   Given the following environmental data for {{location}}, create a concise and easy-to-understand explanation of the current environmental conditions.
   Focus on the most important and impactful information, and avoid technical jargon.
 
-  Air Quality: {{airQuality}}
+  Air Quality (Aerosols & CO): {{airQuality}}
   Soil Data: {{soilData}}
-  Fire Detection: {{fireDetection}}
+  Fire Detection (MODIS): {{fireDetection}}
   Water Resources: {{waterResources}}
   Weather Patterns: {{weatherPatterns}}
-  Temperature: {{temperature}}
-  Additional Metrics: {{additionalMetrics}}
+  Surface Temperature (MODIS): {{temperature}}
+  Additional Metrics (NDVI): {{additionalMetrics}}
 
   Simplified Explanation:`,
 });

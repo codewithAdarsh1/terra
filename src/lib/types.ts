@@ -5,13 +5,8 @@ export type Location = {
 };
 
 export type AirQualityData = {
-  aqi: number;
-  pm25: number;
-  pm10: number;
-  o3: number;
-  no2: number;
-  so2: number;
-  co: number;
+  aerosolIndex: number; // Formerly AQI, now using Aerosol Optical Depth from MISR
+  co: number; // Carbon Monoxide from MOPITT
 };
 
 export type SoilData = {
@@ -25,7 +20,7 @@ export type SoilData = {
 
 export type FireData = {
   activeFires: number;
-  fireRisk: 'low' | 'medium' | 'high' | 'very-high';
+  fireRisk: 'low' | 'medium' | 'high' | 'very-high' | 'unknown';
 };
 
 export type WaterData = {
@@ -42,12 +37,12 @@ export type WeatherForecast = {
 };
 
 export type WeatherData = {
-  currentTemp: number;
+  currentTemp: number; // Now sourced from MODIS Land Surface Temperature
   forecast: WeatherForecast[];
 };
 
 export type VegetationData = {
-    ndvi: number; // Normalized Difference Vegetation Index
+    ndvi: number; // Normalized Difference Vegetation Index from MODIS
 };
 
 export type EnvironmentalData = {

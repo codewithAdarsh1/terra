@@ -12,7 +12,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import type { EnvironmentalData } from '@/lib/types';
 import { getCropRecommendations } from './ai-crop-recommendations';
 import { futureTrendPredictions } from './ai-future-trend-predictions';
 import { aiRiskAssessment } from './ai-risk-assessment';
@@ -39,13 +38,8 @@ const LocationSchema = z.object({
 });
 
 const AirQualitySchema = z.object({
-  aqi: z.number().min(0).max(500).describe('Air Quality Index'),
-  pm25: z.number().min(0).describe('PM2.5 levels'),
-  pm10: z.number().min(0).describe('PM10 levels'),
-  o3: z.number().min(0).describe('Ozone levels'),
-  no2: z.number().min(0).describe('Nitrogen dioxide levels'),
-  so2: z.number().min(0).describe('Sulfur dioxide levels'),
-  co: z.number().min(0).describe('Carbon monoxide levels'),
+  aerosolIndex: z.number().describe('Aerosol Optical Depth'),
+  co: z.number().describe('Carbon Monoxide levels'),
 });
 
 const SoilDataSchema = z.object({
@@ -141,7 +135,7 @@ function getCacheKey(location: z.infer<typeof LocationSchema>, data: z.infer<typ
 // Helper function to validate data quality
 function assessDataQuality(data: z.infer<typeof EnvironmentalDataSchema>): 'excellent' | 'good' | 'fair' | 'poor' {
   const checks = [
-    data.airQuality.aqi >= 0 && data.airQuality.aqi <= 500,
+    data.airQuality.aerosolIndex >= 0,
     data.soil.moisture >= 0 && data.soil.moisture <= 1,
     data.vegetation.ndvi >= -1 && data.vegetation.ndvi <= 1,
     data.fire.fireRisk !== 'unknown',
@@ -196,17 +190,15 @@ function formatWeatherData(
     .slice(0, 3)
     .map(f => `${f.day}: ${f.temp}°C (${f.min}-${f.max}°C)`)
     .join(', ');
-  return `Current Temperature: ${weather.currentTemp}°C, NDVI: ${vegetation.ndvi.toFixed(2)}, 3-Day Forecast: ${forecastSummary}`;
+  return `Current Surface Temperature: ${weather.currentTemp}°C, NDVI: ${vegetation.ndvi.toFixed(2)}, 3-Day Forecast: ${forecastSummary}`;
 }
 
 function formatAirQualityData(airQuality: z.infer<typeof AirQualitySchema>): string {
-  const aqiCategory = airQuality.aqi <= 50 ? 'Good' :
-                      airQuality.aqi <= 100 ? 'Moderate' :
-                      airQuality.aqi <= 150 ? 'Unhealthy for Sensitive Groups' :
-                      airQuality.aqi <= 200 ? 'Unhealthy' :
-                      airQuality.aqi <= 300 ? 'Very Unhealthy' : 'Hazardous';
-  
-  return `AQI: ${airQuality.aqi} (${aqiCategory}), PM2.5: ${airQuality.pm25}µg/m³, PM10: ${airQuality.pm10}µg/m³, O3: ${airQuality.o3}ppb`;
+  const aerosolCategory = airQuality.aerosolIndex < 0.1 ? 'Clear' :
+                          airQuality.aerosolIndex < 0.3 ? 'Hazy' :
+                          'Very Hazy/Smoky';
+
+  return `Aerosol Index: ${airQuality.aerosolIndex.toFixed(3)} (${aerosolCategory}), Carbon Monoxide: ${airQuality.co.toExponential(2)} mol/m^2`;
 }
 
 function formatFireData(fire: z.infer<typeof FireDataSchema>): string {
@@ -234,9 +226,9 @@ function generateHistoricalContext(data: z.infer<typeof EnvironmentalDataSchema>
 }
 
 function generateSummary(locationName: string, data: z.infer<typeof EnvironmentalDataSchema>): string {
-  const airQualityStatus = data.airQuality.aqi < 50 ? 'excellent' :
-                          data.airQuality.aqi < 100 ? 'good' :
-                          data.airQuality.aqi < 150 ? 'moderate' : 'poor';
+  const airQualityStatus = data.airQuality.aerosolIndex < 0.1 ? 'clear' :
+                          data.airQuality.aerosolIndex < 0.3 ? 'hazy' :
+                          'very hazy or smoky';
   
   const vegetationStatus = data.vegetation.ndvi > 0.6 ? 'thriving' :
                           data.vegetation.ndvi > 0.4 ? 'healthy' :
@@ -245,11 +237,11 @@ function generateSummary(locationName: string, data: z.infer<typeof Environmenta
   const soilHealth = data.soil.ph >= 6.0 && data.soil.ph <= 7.5 && 
                     data.soil.moisture > 0.3 && data.soil.moisture < 0.7 ? 'optimal' : 'suboptimal';
 
-  return `Environmental assessment for ${locationName} reveals ${airQualityStatus} air quality (AQI: ${data.airQuality.aqi}). ` +
-         `Vegetation is ${vegetationStatus} with NDVI at ${data.vegetation.ndvi.toFixed(2)}. ` +
+  return `Environmental assessment for ${locationName} reveals ${airQualityStatus} air quality (Aerosol Index: ${data.airQuality.aerosolIndex.toFixed(3)}). ` +
+         `Vegetation is ${vegetationStatus} with an NDVI of ${data.vegetation.ndvi.toFixed(2)}. ` +
          `Soil conditions are ${soilHealth} with ${(data.soil.moisture * 100).toFixed(1)}% moisture and pH ${data.soil.ph}. ` +
          `Fire risk is ${data.fire.fireRisk} with ${data.fire.activeFires} active fires in the region. ` +
-         `Recent precipitation totals ${data.water.precipitation}mm with current temperature at ${data.weather.currentTemp}°C.`;
+         `Recent precipitation totals ${data.water.precipitation}mm with current surface temperature at ${data.weather.currentTemp}°C.`;
 }
 
 // Main orchestrator flow with enhanced features
@@ -263,12 +255,10 @@ const orchestratorFlow = ai.defineFlow(
     const startTime = Date.now();
     const { location, environmentalData, options = {} } = input;
     
-    // Check cache first (unless skipCache is true)
     if (!options.skipCache) {
       const cacheKey = getCacheKey(location, environmentalData);
       const cached = cache.get(cacheKey);
-      
-      if (cached && Date.now() - cached.timestamp < CONFIG.CACHE_TTL) {
+      if (cached && (Date.now() - cached.timestamp < CONFIG.CACHE_TTL)) {
         console.log(`Cache hit for ${cacheKey}`);
         return {
           ...cached.data,
@@ -281,16 +271,13 @@ const orchestratorFlow = ai.defineFlow(
       }
     }
     
-    // Assess data quality
     const dataQuality = assessDataQuality(environmentalData);
     if (dataQuality === 'poor' && options.priority !== 'high') {
       console.warn('Data quality is poor, results may be unreliable');
     }
     
-    // Prepare location name
     const locationName = location.name || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`;
     
-    // Shape data for AI consumption
     const dataStrings = {
       soil: formatSoilData(environmentalData.soil),
       weather: formatWeatherData(environmentalData.weather, environmentalData.vegetation),
@@ -303,74 +290,21 @@ const orchestratorFlow = ai.defineFlow(
     };
 
     try {
-      // Execute all AI flows in parallel with retry logic
       const aiCalls = [
-        retryAICall(
-          () => futureTrendPredictions({
-            location: locationName,
-            historicalData: dataStrings.historical,
-          }),
-          'futureTrendPredictions'
-        ),
-        retryAICall(
-          () => getCropRecommendations({
-            latitude: location.lat,
-            longitude: location.lng,
-            soilData: dataStrings.soil,
-            weatherPatterns: dataStrings.weather,
-          }),
-          'getCropRecommendations'
-        ),
-        retryAICall(
-          () => aiRiskAssessment({
-            airQuality: dataStrings.airQuality,
-            fireData: dataStrings.fire,
-            waterResources: dataStrings.water,
-            weatherPatterns: dataStrings.weather,
-          }),
-          'aiRiskAssessment'
-        ),
-        retryAICall(
-          () => getSimplifiedExplanation({
-            location: locationName,
-            airQuality: dataStrings.airQuality,
-            soilData: dataStrings.soil,
-            fireDetection: dataStrings.fire,
-            waterResources: dataStrings.water,
-            weatherPatterns: dataStrings.weather,
-            temperature: dataStrings.temperature,
-            additionalMetrics: dataStrings.additionalMetrics,
-          }),
-          'getSimplifiedExplanation'
-        ),
-        retryAICall(
-          () => aiEnvironmentalSolutions({
-            airQuality: dataStrings.airQuality,
-            soilData: dataStrings.soil,
-            fireDetection: dataStrings.fire,
-            waterResources: dataStrings.water,
-            weatherPatterns: dataStrings.weather,
-            temperature: dataStrings.temperature,
-          }),
-          'aiEnvironmentalSolutions'
-        ),
+        retryAICall(() => futureTrendPredictions({ location: locationName, historicalData: dataStrings.historical }), 'futureTrendPredictions'),
+        retryAICall(() => getCropRecommendations({ latitude: location.lat, longitude: location.lng, soilData: dataStrings.soil, weatherPatterns: dataStrings.weather }), 'getCropRecommendations'),
+        retryAICall(() => aiRiskAssessment({ airQuality: dataStrings.airQuality, fireData: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather }), 'aiRiskAssessment'),
+        retryAICall(() => getSimplifiedExplanation({ location: locationName, airQuality: dataStrings.airQuality, soilData: dataStrings.soil, fireDetection: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather, temperature: dataStrings.temperature, additionalMetrics: dataStrings.additionalMetrics }), 'getSimplifiedExplanation'),
+        retryAICall(() => aiEnvironmentalSolutions({ airQuality: dataStrings.airQuality, soilData: dataStrings.soil, fireDetection: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather, temperature: dataStrings.temperature }), 'aiEnvironmentalSolutions'),
       ];
 
       const results = await Promise.all(aiCalls);
-      const [
-        predictions,
-        cropRecommendations,
-        riskAssessment,
-        simplifiedExplanation,
-        environmentalSolutions,
-      ] = results;
+      const [predictions, cropRecommendations, riskAssessment, simplifiedExplanation, environmentalSolutions] = results;
 
-      // Generate comprehensive summary
       const summary = generateSummary(locationName, environmentalData);
       
       const processingTime = Date.now() - startTime;
       
-      // Log performance warning if needed
       if (processingTime > CONFIG.PERFORMANCE_THRESHOLD) {
         console.warn(`Orchestrator took ${processingTime}ms to complete (threshold: ${CONFIG.PERFORMANCE_THRESHOLD}ms)`);
       }
@@ -387,23 +321,16 @@ const orchestratorFlow = ai.defineFlow(
           processingTimeMs: processingTime,
           dataQuality,
           cacheable: dataQuality !== 'poor',
-          debugInfo: options.includeDebugInfo ? {
-            location: locationName,
-            dataStrings,
-            aiResults: results.map(r => r ? 'success' : 'failed'),
-          } : undefined,
+          debugInfo: options.includeDebugInfo ? { location: locationName, dataStrings, aiResults: results.map(r => r ? 'success' : 'failed') } : undefined,
         },
       };
 
-      // Cache the result if data quality is acceptable
       if (dataQuality !== 'poor' && !options.skipCache) {
         const cacheKey = getCacheKey(location, environmentalData);
         cache.set(cacheKey, { data: output, timestamp: Date.now() });
         
-        // Clean up old cache entries
         if (cache.size > 100) {
-          const oldestKey = Array.from(cache.entries())
-            .sort(([, a], [, b]) => a.timestamp - b.timestamp)[0][0];
+          const oldestKey = Array.from(cache.entries()).sort(([, a], [, b]) => a.timestamp - b.timestamp)[0][0];
           cache.delete(oldestKey);
         }
       }

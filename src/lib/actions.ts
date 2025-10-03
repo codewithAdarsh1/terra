@@ -5,17 +5,9 @@ import type { Location, EnvironmentalData, AIInsights, AirQualityData } from './
 
 // Constants
 const CONSTANTS = {
-  OPENAQ_RADIUS: 50000, // 50km
   FORECAST_DAYS: 5,
   NASA_FILL_VALUE: -999,
   DEFAULT_TEMPERATURE: 20,
-  AQI_THRESHOLDS: {
-    HAZARDOUS: 250.4,
-    VERY_UNHEALTHY: 150.4,
-    UNHEALTHY: 55.4,
-    MODERATE: 35.4,
-    GOOD: 12.0,
-  },
 } as const;
 
 // Type definitions for API responses
@@ -33,51 +25,43 @@ interface NasaPowerResponse {
   };
 }
 
-interface OpenAQMeasurement {
-  parameter: string;
-  value: number;
+interface FirmsResponse {
+  features: {
+    attributes: {
+      acq_date: string;
+      acq_time: string;
+      frp: number; // Fire Radiative Power
+    };
+  }[];
 }
 
-interface OpenAQResult {
-  measurements: OpenAQMeasurement[];
-}
-
-interface OpenAQResponse {
-  results: OpenAQResult[];
-}
 
 // Utility functions
 const formatDateForNasa = (date: Date): string => {
   return date.toISOString().split('T')[0].replace(/-/g, '');
 };
 
-const calculateAqi = (pm25: number): number => {
-  const { AQI_THRESHOLDS } = CONSTANTS;
-  
-  if (pm25 > AQI_THRESHOLDS.HAZARDOUS) return Math.round(301 + (pm25 - AQI_THRESHOLDS.HAZARDOUS) * (199 / 249));
-  if (pm25 > AQI_THRESHOLDS.VERY_UNHEALTHY) return Math.round(201 + (pm25 - AQI_THRESHOLDS.VERY_UNHEALTHY) * (99 / 99));
-  if (pm25 > AQI_THRESHOLDS.UNHEALTHY) return Math.round(151 + (pm25 - AQI_THRESHOLDS.UNHEALTHY) * (49 / 94));
-  if (pm25 > AQI_THRESHOLDS.MODERATE) return Math.round(101 + (pm25 - AQI_THRESHOLDS.MODERATE) * (49 / 19));
-  if (pm25 > AQI_THRESHOLDS.GOOD) return Math.round(51 + (pm25 - AQI_THRESHOLDS.GOOD) * (49 / 23.4));
-  if (pm25 >= 0) return Math.round((pm25 / AQI_THRESHOLDS.GOOD) * 50);
-  return 0;
-};
-
-// Fetch NASA POWER API data with proper error handling
+// Fetch NASA POWER API data for Terra-derived metrics
 async function fetchNasaPowerData(location: Location): Promise<NasaPowerResponse | null> {
   const apiKey = process.env.NASA_API_KEY;
   if (!apiKey) {
-    console.warn('NASA_API_KEY is not set. Using mock data for weather.');
+    console.warn('NASA_API_KEY is not set. Using mock data for NASA POWER.');
     return null;
   }
 
   const baseUrl = 'https://power.larc.nasa.gov/api/temporal/daily/point';
+  // Parameters from Terra's instruments (MODIS, MOPITT, MISR)
   const parameters = [
-    'T2M', 'TS_DAY_MODIS', 'T2M_MAX', 'T2M_MIN', 'PRECTOTCORR', 'WS10M', 'NDVI_MODIS'
+    'TS_DAY_MODIS', // Land Surface Temp (MODIS)
+    'NDVI_MODIS',   // Vegetation Index (MODIS)
+    'PRECTOTCORR',  // Precipitation (assimilated data, but context for NDVI)
+    'AOD_550_MISR', // Aerosol Optical Depth (MISR)
+    'CO_COLUMN_MOPITT', // Carbon Monoxide (MOPITT)
+    'T2M_MAX',
+    'T2M_MIN',
   ].join(',');
   
   const endDate = new Date();
-  endDate.setDate(endDate.getDate() + 2);
   const startDate = new Date();
   startDate.setDate(endDate.getDate() - 6);
 
@@ -99,7 +83,7 @@ async function fetchNasaPowerData(location: Location): Promise<NasaPowerResponse
 
   try {
     const response = await fetch(apiUrl.toString(), {
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      signal: AbortSignal.timeout(10000),
     });
     
     if (!response.ok) {
@@ -107,102 +91,57 @@ async function fetchNasaPowerData(location: Location): Promise<NasaPowerResponse
       return null;
     }
     
-    const data: NasaPowerResponse = await response.json();
-    return data;
+    return await response.json();
   } catch (error) {
     console.error('Error fetching from NASA POWER API:', error);
     return null;
   }
 }
 
-// Fetch fire data with improved logic
-async function fetchFireData(location: Location) {
-  try {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const isDryRegion = location.lat < 40 && location.lat > -40;
-    const fireRiskLevels = ['low', 'medium', 'high', 'very-high'] as const;
-    
-    let riskIndex = Math.floor(Math.random() * 2);
-    if (isDryRegion) {
-      riskIndex = Math.min(3, Math.floor(Math.random() * 3) + 1);
-    }
-    
-    return {
-      activeFires: Math.floor(Math.random() * (riskIndex + 1) * 2),
-      fireRisk: fireRiskLevels[riskIndex],
-    };
-  } catch (error) {
-    console.error('Error fetching fire data:', error);
-    return {
-      activeFires: 0,
-      fireRisk: 'unknown' as const,
-    };
+// Fetch active fire data from NASA FIRMS (uses MODIS on Terra)
+async function fetchFireData(location: Location): Promise<{ activeFires: number; fireRisk: 'low' | 'medium' | 'high' | 'very-high' }> {
+  const apiKey = process.env.FIRMS_API_KEY;
+  if (!apiKey) {
+    console.warn('FIRMS_API_KEY is not set. Using mock fire data.');
+    return { activeFires: 0, fireRisk: 'low' };
   }
-}
-
-// Fetch Air Quality data with improved error handling
-async function fetchOpenAqData(location: Location): Promise<AirQualityData> {
-  const baseUrl = 'https://api.openaq.org/v2/latest';
-  const apiUrl = new URL(baseUrl);
   
-  apiUrl.searchParams.append('coordinates', `${location.lat},${location.lng}`);
-  apiUrl.searchParams.append('radius', CONSTANTS.OPENAQ_RADIUS.toString());
-  apiUrl.searchParams.append('order_by', 'distance');
-  apiUrl.searchParams.append('limit', '1');
+  const date = new Date();
+  date.setDate(date.getDate() - 1); // Check for fires in the last 24 hours
+  const acqDate = date.toISOString().split('T')[0];
 
+  const boundingBox = [
+    location.lng - 0.5,
+    location.lat - 0.5,
+    location.lng + 0.5,
+    location.lat + 0.5,
+  ].join(',');
+
+  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${apiKey}/MODIS_NRT/${boundingBox}/1/${acqDate}`;
+  
   try {
-    const response = await fetch(apiUrl.toString(), {
-      headers: {
-        'accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(10000), // 10 second timeout
-    });
-
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!response.ok) {
-      throw new Error(`OpenAQ API request failed: ${response.statusText}`);
+      console.error(`FIRMS API Error: ${response.status} ${response.statusText}`);
+      return { activeFires: 0, fireRisk: 'low' };
     }
 
-    const data: OpenAQResponse = await response.json();
+    const text = await response.text();
+    const lines = text.trim().split('\n');
+    const activeFires = lines.length > 1 ? lines.length - 1 : 0; // -1 for header
 
-    if (data.results?.length > 0) {
-      const measurements = data.results[0].measurements;
-      
-      const getMeasurementValue = (param: string): number => {
-        const measurement = measurements.find((m) => m.parameter === param);
-        return measurement ? parseFloat(measurement.value.toFixed(2)) : 0;
-      };
-      
-      const pm25 = getMeasurementValue('pm25');
+    let fireRisk: 'low' | 'medium' | 'high' | 'very-high' = 'low';
+    if (activeFires > 10) fireRisk = 'very-high';
+    else if (activeFires > 5) fireRisk = 'high';
+    else if (activeFires > 0) fireRisk = 'medium';
 
-      return {
-        aqi: calculateAqi(pm25),
-        pm25,
-        pm10: getMeasurementValue('pm10'),
-        o3: getMeasurementValue('o3'),
-        no2: getMeasurementValue('no2'),
-        so2: getMeasurementValue('so2'),
-        co: getMeasurementValue('co'),
-      };
-    }
+    return { activeFires, fireRisk };
   } catch (error) {
-    console.error('Error fetching from OpenAQ API:', error);
+    console.error('Error fetching from FIRMS API:', error);
+    return { activeFires: 0, fireRisk: 'unknown' as const };
   }
-
-  // Fallback to mock data
-  console.warn('Using mock Air Quality data.');
-  const randomAqi = Math.floor(Math.random() * 200);
-  return {
-    aqi: randomAqi,
-    pm25: parseFloat((randomAqi / 4).toFixed(2)),
-    pm10: parseFloat((randomAqi / 2).toFixed(2)),
-    o3: parseFloat((Math.random() * 120).toFixed(2)),
-    no2: parseFloat((Math.random() * 40).toFixed(2)),
-    so2: parseFloat((Math.random() * 20).toFixed(2)),
-    co: parseFloat((Math.random() * 5).toFixed(2)),
-  };
 }
+
 
 // Helper function to safely extract values from NASA Power data
 function extractPowerValue(
@@ -231,40 +170,27 @@ function extractPowerValue(
 
 // Main function to fetch environmental data
 async function fetchEnvironmentalData(location: Location): Promise<EnvironmentalData> {
-  const [powerData, fireData, airQualityData] = await Promise.allSettled([
+  const [powerData, fireDataResult] = await Promise.allSettled([
     fetchNasaPowerData(location),
     fetchFireData(location),
-    fetchOpenAqData(location),
   ]);
 
-  // Handle Promise results safely
   const nasaData = powerData.status === 'fulfilled' ? powerData.value : null;
-  const fireInfo = fireData.status === 'fulfilled' ? fireData.value : { activeFires: 0, fireRisk: 'unknown' as const };
-  const airQuality = airQualityData.status === 'fulfilled' ? airQualityData.value : {
-    aqi: 50,
-    pm25: 12.5,
-    pm10: 25,
-    o3: 60,
-    no2: 20,
-    so2: 10,
-    co: 2.5,
-  };
+  const fireInfo = fireDataResult.status === 'fulfilled' ? fireDataResult.value : { activeFires: 0, fireRisk: 'unknown' as const };
 
-  // Extract date keys safely
   let dateKeys: string[] = [];
-  if (nasaData?.properties?.parameter?.T2M) {
-    dateKeys = Object.keys(nasaData.properties.parameter.T2M).sort();
+  if (nasaData?.properties?.parameter?.TS_DAY_MODIS) {
+    dateKeys = Object.keys(nasaData.properties.parameter.TS_DAY_MODIS).sort();
   }
 
   const todayKey = dateKeys.length >= 3 ? dateKeys[dateKeys.length - 3] : '';
   const currentTemp = extractPowerValue(
     nasaData,
-    'T2M',
+    'TS_DAY_MODIS',
     todayKey,
     () => CONSTANTS.DEFAULT_TEMPERATURE + Math.random() * 10
   );
 
-  // Generate forecast
   const forecast = Array.from({ length: CONSTANTS.FORECAST_DAYS }, (_, index) => {
     const day = new Date();
     day.setDate(day.getDate() + index - 2);
@@ -272,33 +198,30 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
 
     return {
       day: day.toLocaleDateString('en-US', { weekday: 'short' }),
-      temp: extractPowerValue(nasaData, 'T2M', key, () => currentTemp + Math.random() * 4 - 2),
+      temp: extractPowerValue(nasaData, 'TS_DAY_MODIS', key, () => currentTemp + Math.random() * 4 - 2),
       max: extractPowerValue(nasaData, 'T2M_MAX', key, () => currentTemp + 5),
       min: extractPowerValue(nasaData, 'T2M_MIN', key, () => currentTemp - 5),
       condition: 'Varies',
     };
   });
 
-  // Calculate average precipitation
-  let avgPrecip = 0;
-  if (dateKeys.length > 0) {
-    const precipValues = dateKeys.map(key => 
-      extractPowerValue(nasaData, 'PRECTOTCORR', key, () => 0)
-    );
-    avgPrecip = precipValues.reduce((acc, val) => acc + val, 0) / precipValues.length;
-  } else {
-    avgPrecip = Math.random() * 10;
-  }
+  const avgPrecip = dateKeys.length > 0
+    ? dateKeys.map(key => extractPowerValue(nasaData, 'PRECTOTCORR', key, () => 0)).reduce((a, b) => a + b, 0) / dateKeys.length
+    : Math.random() * 10;
 
   const soilMoisture = avgPrecip > 1 ? Math.random() * 0.5 + 0.2 : Math.random() * 0.3;
-  const soilTemperature = extractPowerValue(nasaData, 'TS_DAY_MODIS', todayKey, () => currentTemp - 2 + Math.random() * 4);
-  const ndvi = extractPowerValue(nasaData, 'NDVI_MODIS', todayKey, () => Math.min(0.9, Math.max(0.1, soilMoisture * 1.2 - (currentTemp > 30 ? 0.2 : 0))));
+  const ndvi = extractPowerValue(nasaData, 'NDVI_MODIS', todayKey, () => Math.min(0.9, Math.max(0.1, soilMoisture * 1.2)));
+
+  const airQuality: AirQualityData = {
+    aerosolIndex: extractPowerValue(nasaData, 'AOD_550_MISR', todayKey, () => Math.random() * 0.5),
+    co: extractPowerValue(nasaData, 'CO_COLUMN_MOPITT', todayKey, () => Math.random() * 0.05),
+  };
 
   return {
     airQuality,
     soil: {
       moisture: parseFloat(soilMoisture.toFixed(2)),
-      temperature: soilTemperature,
+      temperature: currentTemp,
       ph: parseFloat((5.5 + Math.random() * 2).toFixed(2)),
       nitrogen: parseFloat((10 + soilMoisture * 40).toFixed(2)),
       phosphorus: parseFloat((5 + soilMoisture * 20).toFixed(2)),
@@ -320,7 +243,7 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
   };
 }
 
-// Geocoding functions with improved error handling
+// Geocoding functions (unchanged)
 export async function reverseGeocode(location: Location): Promise<string | null> {
   const url = new URL('https://nominatim.openstreetmap.org/reverse');
   url.searchParams.append('format', 'json');
@@ -386,45 +309,37 @@ export async function geocodeLocation(locationName: string): Promise<Location | 
   return null;
 }
 
-// Main export function - now much simpler!
+
+// Main export function
 export async function getLocationData(
   location: Location
 ): Promise<EnvironmentalData & AIInsights> {
   try {
-    // Step 1: Fetch environmental data
     const environmentalData = await fetchEnvironmentalData(location);
     
-    // Step 2: Call the AI orchestrator with the raw data
     const aiInsights = await aiInsightsOrchestrator({
       location,
       environmentalData,
     });
     
-    // Step 3: Combine and return
     return {
       ...environmentalData,
       ...aiInsights,
     };
   } catch (error) {
     console.error('Error in getLocationData:', error);
-    
-    // If there's an error, still try to return environmental data with fallback AI insights
-    try {
-      const environmentalData = await fetchEnvironmentalData(location);
-      return {
-        ...environmentalData,
-        summary: 'AI insights temporarily unavailable.',
-        futurePredictions: 'Unable to generate predictions.',
-        cropRecommendations: 'Unable to generate recommendations.',
-        riskAssessment: 'Unable to assess risks.',
-        simplifiedExplanation: 'Unable to generate explanation.',
-        environmentalSolutions: 'Unable to generate solutions.',
-      };
-    } catch (fallbackError) {
-      console.error('Critical error in getLocationData fallback:', fallbackError);
-      throw new Error('Failed to fetch any location data.');
-    }
+    // Fallback in case of critical failure
+    const environmentalData = await fetchEnvironmentalData(location).catch(() => {
+        throw new Error('Failed to fetch even fallback environmental data.');
+    });
+    return {
+      ...environmentalData,
+      summary: 'AI insights temporarily unavailable.',
+      futurePredictions: 'Unable to generate predictions.',
+      cropRecommendations: 'Unable to generate recommendations.',
+      riskAssessment: 'Unable to assess risks.',
+      simplifiedExplanation: 'Unable to generate explanation.',
+      environmentalSolutions: 'Unable to generate solutions.',
+    };
   }
 }
-
-    

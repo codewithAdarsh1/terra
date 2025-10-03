@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { EnvironmentalData, Location } from "@/lib/types";
-import { Thermometer, Wind, Droplets, Flame, Trees, TestTube2 } from "lucide-react";
+import { Thermometer, Wind, Droplets, Flame, Trees, TestTube2, CloudCog } from "lucide-react";
 import { format } from "date-fns";
 import { DownloadReportButton } from "./DownloadReportButton";
 import { cn } from "@/lib/utils";
@@ -11,10 +11,9 @@ interface EnvironmentalDataDashboardProps {
   location: Location;
 }
 
-const getAqiColor = (aqi: number) => {
-  if (aqi > 150) return 'text-destructive';
-  if (aqi > 100) return 'text-yellow-500';
-  if (aqi > 50) return 'text-yellow-400';
+const getAerosolColor = (index: number) => {
+  if (index > 0.4) return 'text-destructive';
+  if (index > 0.2) return 'text-yellow-500';
   return 'text-primary';
 }
 
@@ -32,18 +31,18 @@ export function EnvironmentalDataDashboard({ data, location }: EnvironmentalData
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <DataCard
             icon={<Wind className="h-6 w-6 text-muted-foreground" />}
-            title="Air Quality Index"
-            value={data.airQuality.aqi}
+            title="Aerosol Index"
+            value={data.airQuality.aerosolIndex.toFixed(3)}
             unit=""
-            description={`PM2.5: ${data.airQuality.pm25}`}
-            valueClassName={getAqiColor(data.airQuality.aqi)}
+            description={`CO: ${data.airQuality.co.toExponential(2)}`}
+            valueClassName={getAerosolColor(data.airQuality.aerosolIndex)}
           />
           <DataCard
             icon={<Thermometer className="h-6 w-6 text-muted-foreground" />}
-            title="Avg. Soil Temp"
+            title="Surface Temp (MODIS)"
             value={data.soil.temperature}
             unit="°C"
-            description={`Moisture: ${(data.soil.moisture * 100).toFixed(0)}%`}
+            description={`Soil Moisture: ${(data.soil.moisture * 100).toFixed(0)}%`}
           />
           <DataCard
             icon={<Droplets className="h-6 w-6 text-muted-foreground" />}
@@ -54,7 +53,7 @@ export function EnvironmentalDataDashboard({ data, location }: EnvironmentalData
           />
           <DataCard
             icon={<Flame className="h-6 w-6 text-muted-foreground" />}
-            title="Active Fires"
+            title="Active Fires (FIRMS)"
             value={data.fire.activeFires}
             unit=""
             description={`Risk: ${data.fire.fireRisk}`}
@@ -62,16 +61,16 @@ export function EnvironmentalDataDashboard({ data, location }: EnvironmentalData
           />
           <DataCard
             icon={<Trees className="h-6 w-6 text-muted-foreground" />}
-            title="Vegetation Index"
+            title="Vegetation (NDVI)"
             value={data.vegetation.ndvi}
-            unit="NDVI"
+            unit=""
             description={data.vegetation.ndvi > 0.6 ? "Dense Vegetation" : "Sparse Vegetation"}
           />
-          <DataCard
-            icon={<TestTube2 className="h-6 w-6 text-muted-foreground" />}
-            title="Soil pH"
+           <DataCard
+            icon={<CloudCog className="h-6 w-6 text-muted-foreground" />}
+            title="Simulated Soil"
             value={data.soil.ph}
-            unit=""
+            unit="pH"
             description={`N: ${data.soil.nitrogen} P: ${data.soil.phosphorus} K: ${data.soil.potassium}`}
           />
         </div>

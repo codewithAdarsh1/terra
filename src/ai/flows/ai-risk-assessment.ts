@@ -12,10 +12,10 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const AIRiskAssessmentInputSchema = z.object({
-  airQuality: z.string().describe('Air quality data for the location.'),
-  fireData: z.string().describe('Fire data, including active fires and risk level.'),
+  airQuality: z.string().describe('Air quality data (Aerosol Index, CO levels) for the location.'),
+  fireData: z.string().describe('Fire data from MODIS, including active fires and risk level.'),
   waterResources: z.string().describe('Water resources data, including precipitation.'),
-  weatherPatterns: z.string().describe('Current weather patterns.'),
+  weatherPatterns: z.string().describe('Current weather patterns and surface temperature.'),
 });
 export type AIRiskAssessmentInput = z.infer<typeof AIRiskAssessmentInputSchema>;
 
@@ -32,14 +32,14 @@ const prompt = ai.definePrompt({
   name: 'aiRiskAssessmentPrompt',
   input: {schema: AIRiskAssessmentInputSchema},
   output: {schema: AIRiskAssessmentOutputSchema},
-  prompt: `You are an AI assistant that specializes in environmental risk assessment.
+  prompt: `You are an AI assistant that specializes in environmental risk assessment using data from NASA's Terra satellite.
   
-  Analyze the following data and provide a concise risk assessment. Focus on drought risk, fire risk, and potential air quality issues.
+  Analyze the following data and provide a concise risk assessment. Focus on drought risk, fire risk, and potential air quality issues based on aerosols and CO.
 
-  Air Quality: {{{airQuality}}}
-  Fire Data: {{{fireData}}}
+  Air Quality (Aerosol & CO from MISR/MOPITT): {{{airQuality}}}
+  Fire Data (from MODIS/FIRMS): {{{fireData}}}
   Water Resources: {{{waterResources}}}
-  Weather Patterns: {{{weatherPatterns}}}
+  Weather Patterns (from MODIS): {{{weatherPatterns}}}
 
   Risk Assessment:`,
 });

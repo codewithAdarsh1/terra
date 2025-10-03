@@ -12,7 +12,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const AIEnvironmentalSolutionsInputSchema = z.object({
-  airQuality: z.string().describe('Air quality data for the location.'),
+  airQuality: z.string().describe('Air quality data (Aerosol Index, Carbon Monoxide) for the location.'),
   soilData: z.string().describe('Soil data for the location.'),
   fireDetection: z.string().describe('Fire detection data for the location.'),
   waterResources: z.string().describe('Water resources data for the location.'),
@@ -34,16 +34,16 @@ const prompt = ai.definePrompt({
   name: 'aiEnvironmentalSolutionsPrompt',
   input: {schema: AIEnvironmentalSolutionsInputSchema},
   output: {schema: AIEnvironmentalSolutionsOutputSchema},
-  prompt: `You are an AI assistant that suggests actionable environmental solutions based on the analyzed data for a location.
+  prompt: `You are an AI assistant that suggests actionable environmental solutions based on the analyzed satellite data for a location.
 
-  Provide clear and concise solutions based on the following data:
+  Provide clear and concise solutions based on the following data derived from NASA's Terra satellite:
 
-  Air Quality: {{{airQuality}}}
+  Air Quality (Aerosols & CO): {{{airQuality}}}
   Soil Data: {{{soilData}}}
-  Fire Detection: {{{fireDetection}}}
+  Fire Detection (MODIS): {{{fireDetection}}}
   Water Resources: {{{waterResources}}}
   Weather Patterns: {{{weatherPatterns}}}
-  Temperature: {{{temperature}}}
+  Surface Temperature (MODIS): {{{temperature}}}
 
   Solutions:`,
 });
