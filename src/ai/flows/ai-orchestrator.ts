@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview Master AI orchestrator that coordinates all AI insights generation for environmental data.
+ * @fileOverview Master AI orchestrator with improved error handling
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,7 +13,6 @@ import { getSimplifiedExplanation } from '../ai-simplified-data-explanations';
 import { aiEnvironmentalSolutions } from '../ai-environmental-solutions';
 import { healthAdvisory } from './ai-health-advisory';
 
-// Define the output schema for the orchestrator
 const OrchestratorOutputSchema = z.object({
   summary: z.string().describe('Executive summary of environmental conditions'),
   futurePredictions: z.string().describe('AI-generated future trend predictions'),
@@ -26,11 +25,6 @@ const OrchestratorOutputSchema = z.object({
 
 export type AIOrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 
-
-/**
- * Generates a concise summary of the environmental data.
- * This is a non-AI helper function to create a baseline summary.
- */
 function generateSummary(data: EnvironmentalData): string {
   const locationName = data.location.name || `${data.location.lat.toFixed(2)}, ${data.location.lng.toFixed(2)}`;
   
@@ -52,18 +46,17 @@ function generateSummary(data: EnvironmentalData): string {
          `Recent precipitation totals ${data.water.precipitation}mm with current surface temperature at ${data.weather.currentTemp}°C.`;
 }
 
-
-// Main orchestrator flow
 const orchestratorFlow = ai.defineFlow(
   {
     name: 'aiInsightsOrchestratorFlow',
-    // Input is now the raw EnvironmentalData object
     inputSchema: z.any(), 
     outputSchema: OrchestratorOutputSchema,
   },
   async (environmentalData: EnvironmentalData) => {
     
-    // All AI flows are called in parallel
+    console.log('🚀 Starting AI Orchestrator for location:', environmentalData.location.name);
+    
+    // Call all AI flows in parallel
     const aiCalls = [
       futureTrendPredictions(environmentalData),
       getCropRecommendations(environmentalData),
@@ -73,7 +66,6 @@ const orchestratorFlow = ai.defineFlow(
       healthAdvisory(environmentalData),
     ];
 
-    // Use Promise.allSettled to ensure all promises complete, even if some fail
     const results = await Promise.allSettled(aiCalls);
     
     const [
@@ -85,44 +77,54 @@ const orchestratorFlow = ai.defineFlow(
       healthResult
     ] = results;
 
-    // A non-AI summary is generated as a baseline
+    // Log detailed error information
+    results.forEach((result, index) => {
+      const flowNames = ['Future Predictions', 'Crop Recommendations', 'Risk Assessment', 
+                        'Simplified Explanation', 'Environmental Solutions', 'Health Advisory'];
+      
+      if (result.status === 'rejected') {
+        console.error(`❌ ${flowNames[index]} failed:`, result.reason);
+        console.error('Error details:', JSON.stringify(result.reason, null, 2));
+      } else {
+        console.log(`✅ ${flowNames[index]} succeeded`);
+      }
+    });
+
     const summary = generateSummary(environmentalData);
     
-    // Construct the final output, with fallbacks for failed calls
     const output: AIOrchestratorOutput = {
       summary,
       futurePredictions: predictionsResult.status === 'fulfilled' 
           ? predictionsResult.value.predictions 
-          : 'Future trend analysis is temporarily unavailable.',
+          : `Error: ${predictionsResult.status === 'rejected' ? predictionsResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
       cropRecommendations: cropRecommendationsResult.status === 'fulfilled' 
           ? cropRecommendationsResult.value.cropRecommendations 
-          : 'Crop recommendations are being processed.',
+          : `Error: ${cropRecommendationsResult.status === 'rejected' ? cropRecommendationsResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
       riskAssessment: riskAssessmentResult.status === 'fulfilled' 
           ? riskAssessmentResult.value.riskAssessment 
-          : 'Risk assessment in progress.',
+          : `Error: ${riskAssessmentResult.status === 'rejected' ? riskAssessmentResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
       simplifiedExplanation: simplifiedExplanationResult.status === 'fulfilled' 
           ? simplifiedExplanationResult.value.simplifiedExplanation 
-          : `Environmental conditions at ${environmentalData.location.name} are being analyzed.`,
+          : `Error: ${simplifiedExplanationResult.status === 'rejected' ? simplifiedExplanationResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
       environmentalSolutions: environmentalSolutionsResult.status === 'fulfilled' 
           ? environmentalSolutionsResult.value.solutions 
-          : 'Environmental solutions are being formulated.',
+          : `Error: ${environmentalSolutionsResult.status === 'rejected' ? environmentalSolutionsResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
       healthAdvisory: healthResult.status === 'fulfilled' 
           ? healthResult.value.healthAdvisory 
-          : 'Health advisory is currently unavailable.',
+          : `Error: ${healthResult.status === 'rejected' ? healthResult.reason?.message || 'Unknown error' : 'Failed to generate'}`,
     };
 
-    // Log any failed promises for debugging
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.error(`AI flow at index ${index} failed:`, result.reason);
-      }
-    });
-
+    console.log('🎉 AI Orchestrator completed');
+    
     return output;
   }
 );
 
-// Export the main orchestrator function
 export async function aiInsightsOrchestrator(input: EnvironmentalData): Promise<AIOrchestratorOutput> {
-  return orchestratorFlow(input);
+  try {
+    return await orchestratorFlow(input);
+  } catch (error) {
+    console.error('💥 Critical error in AI Orchestrator:', error);
+    throw error;
+  }
 }
