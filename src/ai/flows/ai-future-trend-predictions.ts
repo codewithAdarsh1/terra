@@ -26,15 +26,15 @@ const prompt = ai.definePrompt({
 
   Analyze the following data for the given location and provide predictions for future environmental trends over the next 1-3 months. Consider seasonality and the provided metrics.
 
-  Location: {{{environmentalData.location.name}}}
+  Location: {{{location.name}}}
 
   Current Data Snapshot:
-  - Air Quality (Aerosol Index): {{{environmentalData.airQuality.aerosolIndex}}}
-  - Surface Temperature: {{{environmentalData.weather.currentTemp}}}°C
-  - Vegetation Index (NDVI): {{{environmentalData.vegetation.ndvi}}}
-  - Soil Moisture: {{{environmentalData.soil.moisture}}}
-  - Fire Risk: {{{environmentalData.fire.fireRisk}}}
-  - 5-Day Forecast: {{{environmentalData.weather.forecast.[0].condition}}}, {{{environmentalData.weather.forecast.[1].condition}}}, {{{environmentalData.weather.forecast.[2].condition}}}
+  - Air Quality (Aerosol Index): {{{airQuality.aerosolIndex}}}
+  - Surface Temperature: {{{weather.currentTemp}}}°C
+  - Vegetation Index (NDVI): {{{vegetation.ndvi}}}
+  - Soil Moisture: {{{soil.moisture}}}
+  - Fire Risk: {{{fire.fireRisk}}}
+  - 5-Day Forecast: {{{weather.forecast.[0].condition}}}, {{{weather.forecast.[1].condition}}}, {{{weather.forecast.[2].condition}}}
 
   Based on this snapshot, provide short-term predictions for:
   1. Temperature and precipitation trends.
@@ -51,7 +51,7 @@ const futureTrendPredictionsFlow = ai.defineFlow(
     outputSchema: FutureTrendPredictionsOutputSchema,
   },
   async (environmentalData) => {
-    const {output} = await prompt({environmentalData});
+    const {output} = await prompt(environmentalData);
     return output!;
   }
 );

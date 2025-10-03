@@ -22,13 +22,13 @@ const simplifiedExplanationPrompt = ai.definePrompt({
   output: {schema: SimplifiedExplanationOutputSchema},
   prompt: `You are an AI assistant that specializes in simplifying complex environmental data from NASA's Terra satellite for the average person.
 
-  Given the following environmental data for {{environmentalData.location.name}}, create a concise and easy-to-understand explanation of the current environmental conditions.
+  Given the following environmental data for {{location.name}}, create a concise and easy-to-understand explanation of the current environmental conditions.
   Focus on the most important and impactful information, and avoid technical jargon. Explain what the numbers mean in simple terms.
 
-  - Air Quality (Aerosol & CO): An Aerosol Index of {{environmentalData.airQuality.aerosolIndex}} and Carbon Monoxide level of {{environmentalData.airQuality.co}}.
-  - Soil & Vegetation: Soil moisture is at {{environmentalData.soil.moisture}} and the vegetation index (NDVI) is {{environmentalData.vegetation.ndvi}}.
-  - Fire Situation: There are {{environmentalData.fire.activeFires}} active fires with a risk level of '{{environmentalData.fire.fireRisk}}'.
-  - Weather: The current surface temperature is {{environmentalData.weather.currentTemp}}°C.
+  - Air Quality (Aerosol & CO): An Aerosol Index of {{airQuality.aerosolIndex}} and Carbon Monoxide level of {{airQuality.co}}.
+  - Soil & Vegetation: Soil moisture is at {{soil.moisture}} and the vegetation index (NDVI) is {{vegetation.ndvi}}.
+  - Fire Situation: There are {{fire.activeFires}} active fires with a risk level of '{{fire.fireRisk}}'.
+  - Weather: The current surface temperature is {{weather.currentTemp}}°C.
 
   Based on this, what is the simple story of what is happening in this location?
   `,
@@ -42,7 +42,7 @@ const simplifiedExplanationFlow = ai.defineFlow(
     outputSchema: SimplifiedExplanationOutputSchema,
   },
   async (environmentalData) => {
-    const {output} = await simplifiedExplanationPrompt({environmentalData});
+    const {output} = await simplifiedExplanationPrompt(environmentalData);
     return output!;
   }
 );
