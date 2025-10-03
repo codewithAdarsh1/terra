@@ -10,8 +10,8 @@ import type { Location, EnvironmentalData, AIInsights, AirQualityData } from './
 // Function to fetch data from NASA POWER API
 async function fetchNasaPowerData(location: Location) {
   const apiKey = process.env.NASA_API_KEY;
-  if (!apiKey || apiKey === 'OpeoQRPT62WP5uv9Rslc6s52psCeqlmaUIOUKKZH') {
-    console.warn('NASA_API_KEY is not set or is a placeholder. Using mock data for weather.');
+  if (!apiKey) {
+    console.warn('NASA_API_KEY is not set. Using mock data for weather.');
     return null;
   }
   const baseUrl = 'https://power.larc.nasa.gov/api/temporal/daily/point';
@@ -31,10 +31,14 @@ async function fetchNasaPowerData(location: Location) {
   
   const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
 
-  const apiUrl = `${baseUrl}?parameters=${parameters}&community=RE&longitude=${location.lng}&latitude=${location.lat}&start=${formatDate(startDate)}&end=${formatDate(endDate)}&format=JSON`;
+  const apiUrl = `${baseUrl}?parameters=${parameters}&community=RE&longitude=${location.lng}&latitude=${location.lat}&start=${formatDate(startDate)}&end=${formatDate(endDate)}&format=JSON&header=true`;
 
   try {
-    const response = await fetch(apiUrl);
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
     if (!response.ok) {
       const errorText = await response.text();
       console.error('NASA POWER API Error:', errorText);
