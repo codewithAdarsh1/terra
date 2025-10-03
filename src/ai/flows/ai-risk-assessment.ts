@@ -2,57 +2,51 @@
 
 /**
  * @fileOverview This file contains the AI-powered risk assessment flow.
- *
- * - aiRiskAssessment - A function that provides an AI-powered risk assessment based on environmental data.
- * - AIRiskAssessmentInput - The input type for the aiRiskAssessment function.
- * - AIRiskAssessmentOutput - The return type for the aiRiskassessment function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-
-const AIRiskAssessmentInputSchema = z.object({
-  airQuality: z.string().describe('Air quality data (Aerosol Index, CO levels) for the location.'),
-  fireData: z.string().describe('Fire data from MODIS, including active fires and risk level.'),
-  waterResources: z.string().describe('Water resources data, including precipitation.'),
-  weatherPatterns: z.string().describe('Current weather patterns and surface temperature.'),
-});
-export type AIRiskAssessmentInput = z.infer<typeof AIRiskAssessmentInputSchema>;
+import type { EnvironmentalData } from '@/lib/types';
 
 const AIRiskAssessmentOutputSchema = z.object({
   riskAssessment: z.string().describe('A comprehensive risk assessment covering drought, fire, and other environmental factors.'),
 });
 export type AIRiskAssessmentOutput = z.infer<typeof AIRiskAssessmentOutputSchema>;
 
-export async function aiRiskAssessment(input: AIRiskAssessmentInput): Promise<AIRiskAssessmentOutput> {
-  return aiRiskAssessmentFlow(input);
+export async function aiRiskAssessment(environmentalData: EnvironmentalData): Promise<AIRiskAssessmentOutput> {
+  return aiRiskAssessmentFlow(environmentalData);
 }
 
 const prompt = ai.definePrompt({
   name: 'aiRiskAssessmentPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
-  input: {schema: AIRiskAssessmentInputSchema},
+  input: {schema: z.any()},
   output: {schema: AIRiskAssessmentOutputSchema},
   prompt: `You are an AI assistant that specializes in environmental risk assessment using data from NASA's Terra satellite.
   
-  Analyze the following data and provide a concise risk assessment. Focus on drought risk, fire risk, and potential air quality issues based on aerosols and CO.
+  Analyze the following data for {{{environmentalData.location.name}}} and provide a concise risk assessment. Focus on drought risk, fire risk, and potential air quality issues based on aerosols and CO.
 
-  Air Quality (Aerosol & CO from MISR/MOPITT): {{{airQuality}}}
-  Fire Data (from MODIS/FIRMS): {{{fireData}}}
-  Water Resources: {{{waterResources}}}
-  Weather Patterns (from MODIS): {{{weatherPatterns}}}
+  - Air Quality: Aerosol Index of {{{environmentalData.airQuality.aerosolIndex}}} and CO level of {{{environmentalData.airQuality.co}}}.
+  - Fire Data: {{{environmentalData.fire.activeFires}}} active fires detected with a risk level of '{{{environmentalData.fire.fireRisk}}}'.
+  - Water & Soil: Recent precipitation of {{{environmentalData.water.precipitation}}} mm and soil moisture at {{{environmentalData.soil.moisture}}}.
+  - Temperature: Current surface temperature is {{{environmentalData.weather.currentTemp}}}°C.
+  - Vegetation Health (NDVI): {{{environmentalData.vegetation.ndvi}}}.
 
-  Risk Assessment:`,
+  Synthesize this into a risk assessment covering:
+  1.  **Drought Risk:** Based on precipitation, soil moisture, and temperature.
+  2.  **Fire Risk:** Based on active fires, risk level, temperature, and vegetation dryness (inferred from NDVI).
+  3.  **Air Quality Risk:** Based on aerosol index, CO levels, and fire data.
+  `,
 });
 
 const aiRiskAssessmentFlow = ai.defineFlow(
   {
     name: 'aiRiskAssessmentFlow',
-    inputSchema: AIRiskAssessmentInputSchema,
+    inputSchema: z.any(),
     outputSchema: AIRiskAssessmentOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (environmentalData) => {
+    const {output} = await prompt({environmentalData});
     return output!;
   }
 );

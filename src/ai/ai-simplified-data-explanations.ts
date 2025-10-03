@@ -2,29 +2,11 @@
 
 /**
  * @fileOverview This file defines a Genkit flow for generating simplified explanations of environmental data.
- *
- * The flow takes in raw environmental data and uses Gemini AI to produce user-friendly insights.
- * @fileOverview
- * - `getSimplifiedExplanation` - A function that takes raw environmental data as input and returns a simplified explanation.
- * - `SimplifiedExplanationInput` - The input type for the `getSimplifiedExplanation` function.
- * - `SimplifiedExplanationOutput` - The output type for the `getSimplifiedExplanation` function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-
-// Define the input schema for the flow
-const SimplifiedExplanationInputSchema = z.object({
-  location: z.string().describe('The location for which the environmental data is being requested.'),
-  airQuality: z.string().describe('Air quality data (Aerosol Index, CO) for the specified location.'),
-  soilData: z.string().describe('Soil data for the specified location.'),
-  fireDetection: z.string().describe('Fire detection data for the specified location.'),
-  waterResources: z.string().describe('Water resources data for the specified location.'),
-  weatherPatterns: z.string().describe('Weather patterns for the specified location.'),
-  temperature: z.string().describe('Surface temperature data for the specified location.'),
-  additionalMetrics: z.string().describe('Additional environmental metrics for the specified location.'),
-});
-export type SimplifiedExplanationInput = z.infer<typeof SimplifiedExplanationInputSchema>;
+import type { EnvironmentalData } from '@/lib/types';
 
 // Define the output schema for the flow
 const SimplifiedExplanationOutputSchema = z.object({
@@ -36,43 +18,38 @@ export type SimplifiedExplanationOutput = z.infer<typeof SimplifiedExplanationOu
 const simplifiedExplanationPrompt = ai.definePrompt({
   name: 'simplifiedExplanationPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
-  input: {schema: SimplifiedExplanationInputSchema},
+  input: {schema: z.any()},
   output: {schema: SimplifiedExplanationOutputSchema},
   prompt: `You are an AI assistant that specializes in simplifying complex environmental data from NASA's Terra satellite for the average person.
 
-  Given the following environmental data for {{location}}, create a concise and easy-to-understand explanation of the current environmental conditions.
-  Focus on the most important and impactful information, and avoid technical jargon.
+  Given the following environmental data for {{environmentalData.location.name}}, create a concise and easy-to-understand explanation of the current environmental conditions.
+  Focus on the most important and impactful information, and avoid technical jargon. Explain what the numbers mean in simple terms.
 
-  Air Quality (Aerosols & CO): {{airQuality}}
-  Soil Data: {{soilData}}
-  Fire Detection (MODIS): {{fireDetection}}
-  Water Resources: {{waterResources}}
-  Weather Patterns: {{weatherPatterns}}
-  Surface Temperature (MODIS): {{temperature}}
-  Additional Metrics (NDVI): {{additionalMetrics}}
+  - Air Quality (Aerosol & CO): An Aerosol Index of {{environmentalData.airQuality.aerosolIndex}} and Carbon Monoxide level of {{environmentalData.airQuality.co}}.
+  - Soil & Vegetation: Soil moisture is at {{environmentalData.soil.moisture}} and the vegetation index (NDVI) is {{environmentalData.vegetation.ndvi}}.
+  - Fire Situation: There are {{environmentalData.fire.activeFires}} active fires with a risk level of '{{environmentalData.fire.fireRisk}}'.
+  - Weather: The current surface temperature is {{environmentalData.weather.currentTemp}}°C.
 
-  Simplified Explanation:`,
+  Based on this, what is the simple story of what is happening in this location?
+  `,
 });
 
 // Define the Genkit flow
 const simplifiedExplanationFlow = ai.defineFlow(
   {
     name: 'simplifiedExplanationFlow',
-    inputSchema: SimplifiedExplanationInputSchema,
+    inputSchema: z.any(),
     outputSchema: SimplifiedExplanationOutputSchema,
   },
-  async input => {
-    const {output} = await simplifiedExplanationPrompt(input);
+  async (environmentalData) => {
+    const {output} = await simplifiedExplanationPrompt({environmentalData});
     return output!;
   }
 );
 
 /**
  * Generates a simplified explanation of environmental data for a given location.
- *
- * @param input - The input data containing environmental information.
- * @returns A promise that resolves to an object containing the simplified explanation.
  */
-export async function getSimplifiedExplanation(input: SimplifiedExplanationInput): Promise<SimplifiedExplanationOutput> {
+export async function getSimplifiedExplanation(input: EnvironmentalData): Promise<SimplifiedExplanationOutput> {
   return simplifiedExplanationFlow(input);
 }

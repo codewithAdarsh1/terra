@@ -25,17 +25,6 @@ interface NasaPowerResponse {
   };
 }
 
-interface FirmsResponse {
-  features: {
-    attributes: {
-      acq_date: string;
-      acq_time: string;
-      frp: number; // Fire Radiative Power
-    };
-  }[];
-}
-
-
 // Utility functions
 const formatDateForNasa = (date: Date): string => {
   return date.toISOString().split('T')[0].replace(/-/g, '');
@@ -218,6 +207,7 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
   };
 
   return {
+    location,
     airQuality,
     soil: {
       moisture: parseFloat(soilMoisture.toFixed(2)),
@@ -317,10 +307,7 @@ export async function getLocationData(
   try {
     const environmentalData = await fetchEnvironmentalData(location);
     
-    const aiInsights = await aiInsightsOrchestrator({
-      location,
-      environmentalData,
-    });
+    const aiInsights = await aiInsightsOrchestrator(environmentalData);
     
     return {
       ...environmentalData,

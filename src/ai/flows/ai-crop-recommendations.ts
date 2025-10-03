@@ -1,43 +1,38 @@
 'use server';
 /**
- * @fileOverview An AI agent that provides crop recommendations for a given location.
- *
- * - getCropRecommendations - A function that returns crop recommendations for a given location.
- * - CropRecommendationsInput - The input type for the getCropRecommendations function.
- * - CropRecommendationsOutput - The return type for the getCropRecommendations function.
+ * @fileOverview An AI agent that provides crop recommendations based on environmental data.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-
-const CropRecommendationsInputSchema = z.object({
-  latitude: z.number().describe('The latitude of the location.'),
-  longitude: z.number().describe('The longitude of the location.'),
-  soilData: z.string().describe('The soil data for the location.'),
-  weatherPatterns: z.string().describe('The weather patterns for the location.'),
-});
-export type CropRecommendationsInput = z.infer<typeof CropRecommendationsInputSchema>;
+import type { EnvironmentalData } from '@/lib/types';
 
 const CropRecommendationsOutputSchema = z.object({
   cropRecommendations: z.string().describe('The AI-driven crop recommendations for the selected location.'),
 });
 export type CropRecommendationsOutput = z.infer<typeof CropRecommendationsOutputSchema>;
 
-export async function getCropRecommendations(input: CropRecommendationsInput): Promise<CropRecommendationsOutput> {
-  return cropRecommendationsFlow(input);
+export async function getCropRecommendations(environmentalData: EnvironmentalData): Promise<CropRecommendationsOutput> {
+  return cropRecommendationsFlow(environmentalData);
 }
 
 const prompt = ai.definePrompt({
   name: 'cropRecommendationsPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
-  input: {schema: CropRecommendationsInputSchema},
+  input: { schema: z.any() },
   output: {schema: CropRecommendationsOutputSchema},
-  prompt: `You are an expert agricultural advisor. Based on the provided soil data and weather patterns for a specific location, you will provide crop recommendations.
+  prompt: `You are an expert agricultural advisor. Based on the provided environmental data for a specific location, you will provide crop recommendations.
 
-Location Latitude: {{{latitude}}}
-Location Longitude: {{{longitude}}}
-Soil Data: {{{soilData}}}
-Weather Patterns: {{{weatherPatterns}}}
+Location: {{{environmentalData.location.name}}} (Lat: {{{environmentalData.location.lat}}}, Lon: {{{environmentalData.location.lng}}})
+
+Key Data Points:
+- Soil Moisture: {{{environmentalData.soil.moisture}}}
+- Soil Temperature: {{{environmentalData.soil.temperature}}}°C
+- Soil pH: {{{environmentalData.soil.ph}}}
+- Soil Nutrients (N-P-K): {{{environmentalData.soil.nitrogen}}}-{{{environmentalData.soil.phosphorus}}}-{{{environmentalData.soil.potassium}}} mg/kg
+- Current Surface Temperature: {{{environmentalData.weather.currentTemp}}}°C
+- Vegetation Index (NDVI): {{{environmentalData.vegetation.ndvi}}}
+- Recent Precipitation: {{{environmentalData.water.precipitation}}} mm
 
 Provide a detailed explanation of why you are recommending these crops, including specific benefits and considerations based on the provided data. Format as a numbered list.
 `,
@@ -46,11 +41,11 @@ Provide a detailed explanation of why you are recommending these crops, includin
 const cropRecommendationsFlow = ai.defineFlow(
   {
     name: 'cropRecommendationsFlow',
-    inputSchema: CropRecommendationsInputSchema,
+    inputSchema: z.any(),
     outputSchema: CropRecommendationsOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (environmentalData) => {
+    const {output} = await prompt({environmentalData});
     return output!;
   }
 );

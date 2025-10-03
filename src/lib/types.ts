@@ -46,6 +46,7 @@ export type VegetationData = {
 };
 
 export type EnvironmentalData = {
+  location: Location;
   airQuality: AirQualityData;
   soil: SoilData;
   fire: FireData;

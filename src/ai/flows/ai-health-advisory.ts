@@ -2,43 +2,34 @@
 
 /**
  * @fileOverview This file contains the AI-powered health advisory flow.
- *
- * - healthAdvisory - A function that provides an AI-powered health advisory based on environmental data.
- * - HealthAdvisoryInput - The input type for the healthAdvisory function.
- * - HealthAdvisoryOutput - The return type for the healthAdvisory function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import type { EnvironmentalData } from '@/lib/types';
 
-const HealthAdvisoryInputSchema = z.object({
-  airQuality: z.string().describe('Air quality data (Aerosol Index, CO) for the location.'),
-  temperature: z.string().describe('Surface temperature and weather patterns for the location.'),
-  fireData: z.string().describe('Fire detection data for the location.'),
-});
-export type HealthAdvisoryInput = z.infer<typeof HealthAdvisoryInputSchema>;
 
 const HealthAdvisoryOutputSchema = z.object({
   healthAdvisory: z.string().describe('A comprehensive health advisory based on the provided environmental data.'),
 });
 export type HealthAdvisoryOutput = z.infer<typeof HealthAdvisoryOutputSchema>;
 
-export async function healthAdvisory(input: HealthAdvisoryInput): Promise<HealthAdvisoryOutput> {
-  return healthAdvisoryFlow(input);
+export async function healthAdvisory(environmentalData: EnvironmentalData): Promise<HealthAdvisoryOutput> {
+  return healthAdvisoryFlow(environmentalData);
 }
 
 const prompt = ai.definePrompt({
   name: 'healthAdvisoryPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
-  input: {schema: HealthAdvisoryInputSchema},
+  input: {schema: z.any()},
   output: {schema: HealthAdvisoryOutputSchema},
-  prompt: `You are a public health expert providing advice based on environmental data from NASA satellites.
+  prompt: `You are a public health expert providing advice based on environmental data from NASA satellites for the location: {{{environmentalData.location.name}}}.
   
   Analyze the following data and generate a concise health advisory. Focus on respiratory health, heat exposure, and risks from fires. Provide actionable recommendations for the general public and for sensitive groups.
 
-  Air Quality (Aerosol & CO): {{{airQuality}}}
-  Temperature & Weather: {{{temperature}}}
-  Fire Data (MODIS): {{{fireData}}}
+  - Air Quality: Aerosol Index is {{{environmentalData.airQuality.aerosolIndex}}} and CO is {{{environmentalData.airQuality.co}}}.
+  - Temperature & Weather: Current surface temperature is {{{environmentalData.weather.currentTemp}}}°C.
+  - Fire Data: {{{environmentalData.fire.activeFires}}} active fires and risk level is '{{{environmentalData.fire.fireRisk}}}'.
 
   Health Advisory:`,
 });
@@ -46,11 +37,11 @@ const prompt = ai.definePrompt({
 const healthAdvisoryFlow = ai.defineFlow(
   {
     name: 'healthAdvisoryFlow',
-    inputSchema: HealthAdvisoryInputSchema,
+    inputSchema: z.any(),
     outputSchema: HealthAdvisoryOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (environmentalData) => {
+    const {output} = await prompt({environmentalData});
     return output!;
   }
 );

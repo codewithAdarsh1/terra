@@ -2,61 +2,50 @@
 
 /**
  * @fileOverview This file contains the AI-powered environmental solutions flow.
- *
- * - aiEnvironmentalSolutions - A function that suggests actionable environmental solutions based on analyzed data.
- * - AIEnvironmentalSolutionsInput - The input type for the aiEnvironmentalSolutions function.
- * - AIEnvironmentalSolutionsOutput - The return type for the aiEnvironmentalSolutions function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import type { EnvironmentalData } from '@/lib/types';
 
-const AIEnvironmentalSolutionsInputSchema = z.object({
-  airQuality: z.string().describe('Air quality data (Aerosol Index, Carbon Monoxide) for the location.'),
-  soilData: z.string().describe('Soil data for the location.'),
-  fireDetection: z.string().describe('Fire detection data for the location.'),
-  waterResources: z.string().describe('Water resources data for the location.'),
-  weatherPatterns: z.string().describe('Weather patterns for the location.'),
-  temperature: z.string().describe('Temperature data for the location.'),
-});
-export type AIEnvironmentalSolutionsInput = z.infer<typeof AIEnvironmentalSolutionsInputSchema>;
 
 const AIEnvironmentalSolutionsOutputSchema = z.object({
   solutions: z.string().describe('Actionable environmental solutions powered by AI.'),
 });
 export type AIEnvironmentalSolutionsOutput = z.infer<typeof AIEnvironmentalSolutionsOutputSchema>;
 
-export async function aiEnvironmentalSolutions(input: AIEnvironmentalSolutionsInput): Promise<AIEnvironmentalSolutionsOutput> {
-  return aiEnvironmentalSolutionsFlow(input);
+export async function aiEnvironmentalSolutions(environmentalData: EnvironmentalData): Promise<AIEnvironmentalSolutionsOutput> {
+  return aiEnvironmentalSolutionsFlow(environmentalData);
 }
 
 const prompt = ai.definePrompt({
   name: 'aiEnvironmentalSolutionsPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
-  input: {schema: AIEnvironmentalSolutionsInputSchema},
+  input: {schema: z.any()},
   output: {schema: AIEnvironmentalSolutionsOutputSchema},
   prompt: `You are an AI assistant that suggests actionable environmental solutions based on the analyzed satellite data for a location.
 
-  Provide clear and concise solutions based on the following data derived from NASA's Terra satellite:
+  Provide clear and concise solutions for {{{environmentalData.location.name}}} based on the following data derived from NASA's Terra satellite:
 
-  Air Quality (Aerosols & CO): {{{airQuality}}}
-  Soil Data: {{{soilData}}}
-  Fire Detection (MODIS): {{{fireDetection}}}
-  Water Resources: {{{waterResources}}}
-  Weather Patterns: {{{weatherPatterns}}}
-  Surface Temperature (MODIS): {{{temperature}}}
+  - Air Quality: Aerosol Index {{{environmentalData.airQuality.aerosolIndex}}}, CO {{{environmentalData.airQuality.co}}}
+  - Soil Data: Moisture {{{environmentalData.soil.moisture}}}, Temp {{{environmentalData.soil.temperature}}}°C
+  - Fire Detection: {{{environmentalData.fire.activeFires}}} active fires, Risk: {{{environmentalData.fire.fireRisk}}}
+  - Water Resources: Precipitation {{{environmentalData.water.precipitation}}}mm
+  - Vegetation (NDVI): {{{environmentalData.vegetation.ndvi}}}
+  - Surface Temperature: {{{environmentalData.weather.currentTemp}}}°C
 
-  Solutions:`,
+  Based on any negative indicators in the data above, suggest 2-3 targeted, actionable solutions for local authorities or individuals.
+  `,
 });
 
 const aiEnvironmentalSolutionsFlow = ai.defineFlow(
   {
     name: 'aiEnvironmentalSolutionsFlow',
-    inputSchema: AIEnvironmentalSolutionsInputSchema,
+    inputSchema: z.any(),
     outputSchema: AIEnvironmentalSolutionsOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (environmentalData) => {
+    const {output} = await prompt({environmentalData});
     return output!;
   }
 );
