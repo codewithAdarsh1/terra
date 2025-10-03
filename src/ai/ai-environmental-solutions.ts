@@ -25,14 +25,14 @@ const prompt = ai.definePrompt({
   output: {schema: AIEnvironmentalSolutionsOutputSchema},
   prompt: `You are an AI assistant that suggests actionable environmental solutions based on the analyzed satellite data for a location.
 
-  Provide clear and concise solutions for {{{location.name}}} based on the following data derived from NASA's Terra satellite:
+  Provide clear and concise solutions for {{location.name}} based on the following data derived from NASA's Terra satellite:
 
-  - Air Quality: Aerosol Index {{{airQuality.aerosolIndex}}}, CO {{{airQuality.co}}}
-  - Soil Data: Moisture {{{soil.moisture}}}, Temp {{{soil.temperature}}}°C
-  - Fire Detection: {{{fire.activeFires}}} active fires, Risk: {{{fire.fireRisk}}}
-  - Water Resources: Precipitation {{{water.precipitation}}}mm
-  - Vegetation (NDVI): {{{vegetation.ndvi}}}
-  - Surface Temperature: {{{weather.currentTemp}}}°C
+  - Air Quality: Aerosol Index {{airQuality.aerosolIndex}}}, CO {{airQuality.co}}
+  - Soil Data: Moisture {{soil.moisture}}, Temp {{soil.temperature}}°C
+  - Fire Detection: {{fire.activeFires}} active fires, Risk: {{fire.fireRisk}}
+  - Water Resources: Precipitation {{water.precipitation}}mm
+  - Vegetation (NDVI): {{vegetation.ndvi}}
+  - Surface Temperature: {{weather.currentTemp}}°C
 
   Based on any negative indicators in the data above, suggest 2-3 targeted, actionable solutions for local authorities or individuals.
   `,

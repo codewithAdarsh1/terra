@@ -23,16 +23,16 @@ const prompt = ai.definePrompt({
   output: {schema: CropRecommendationsOutputSchema},
   prompt: `You are an expert agricultural advisor. Based on the provided environmental data for a specific location, you will provide crop recommendations.
 
-Location: {{{location.name}}} (Lat: {{{location.lat}}}, Lon: {{{location.lng}}})
+Location: {{location.name}} (Lat: {{location.lat}}, Lon: {{location.lng}})
 
 Key Data Points:
-- Soil Moisture: {{{soil.moisture}}}
-- Soil Temperature: {{{soil.temperature}}}°C
-- Soil pH: {{{soil.ph}}}
-- Soil Nutrients (N-P-K): {{{soil.nitrogen}}}-{{{soil.phosphorus}}}-{{{soil.potassium}}} mg/kg
-- Current Surface Temperature: {{{weather.currentTemp}}}°C
-- Vegetation Index (NDVI): {{{vegetation.ndvi}}}
-- Recent Precipitation: {{{water.precipitation}}} mm
+- Soil Moisture: {{soil.moisture}}
+- Soil Temperature: {{soil.temperature}}°C
+- Soil pH: {{soil.ph}}
+- Soil Nutrients (N-P-K): {{soil.nitrogen}}-{{soil.phosphorus}}-{{soil.potassium}} mg/kg
+- Current Surface Temperature: {{weather.currentTemp}}°C
+- Vegetation Index (NDVI): {{vegetation.ndvi}}
+- Recent Precipitation: {{water.precipitation}} mm
 
 Provide a detailed explanation of why you are recommending these crops, including specific benefits and considerations based on the provided data. Format as a numbered list.
 `,
