@@ -15,7 +15,7 @@ export type FutureTrendPredictionsOutput = z.infer<typeof FutureTrendPredictions
 
 const prompt = ai.definePrompt({
   name: 'futureTrendPredictionsPrompt',
-  model: 'googleai/gemini-pro',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: z.any()},
   output: {schema: FutureTrendPredictionsOutputSchema},
   prompt: `You are an AI assistant specialized in predicting future environmental trends based on current and historical data.

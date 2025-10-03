@@ -17,7 +17,7 @@ export type SimplifiedExplanationOutput = z.infer<typeof SimplifiedExplanationOu
 // Define the Genkit prompt
 const simplifiedExplanationPrompt = ai.definePrompt({
   name: 'simplifiedExplanationPrompt',
-  model: 'googleai/gemini-pro',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: z.any()},
   output: {schema: SimplifiedExplanationOutputSchema},
   prompt: `You are an AI assistant that specializes in simplifying complex environmental data from NASA's Terra satellite for the average person.
