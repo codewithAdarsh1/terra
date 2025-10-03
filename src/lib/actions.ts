@@ -73,7 +73,7 @@ async function fetchNasaPowerData(location: Location): Promise<NasaPowerResponse
 
   const baseUrl = 'https://power.larc.nasa.gov/api/temporal/daily/point';
   const parameters = [
-    'T2M', 'TS', 'T2M_MAX', 'T2M_MIN', 'PRECTOTCORR', 'WS10M'
+    'T2M', 'TS_DAY_MODIS', 'T2M_MAX', 'T2M_MIN', 'PRECTOTCORR', 'WS10M', 'NDVI_MODIS'
   ].join(',');
   
   const endDate = new Date();
@@ -291,12 +291,14 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
   }
 
   const soilMoisture = avgPrecip > 1 ? Math.random() * 0.5 + 0.2 : Math.random() * 0.3;
+  const soilTemperature = extractPowerValue(nasaData, 'TS_DAY_MODIS', todayKey, () => currentTemp - 2 + Math.random() * 4);
+  const ndvi = extractPowerValue(nasaData, 'NDVI_MODIS', todayKey, () => Math.min(0.9, Math.max(0.1, soilMoisture * 1.2 - (currentTemp > 30 ? 0.2 : 0))));
 
   return {
     airQuality,
     soil: {
       moisture: parseFloat(soilMoisture.toFixed(2)),
-      temperature: extractPowerValue(nasaData, 'TS', todayKey, () => currentTemp - 2 + Math.random() * 4),
+      temperature: soilTemperature,
       ph: parseFloat((5.5 + Math.random() * 2).toFixed(2)),
       nitrogen: parseFloat((10 + soilMoisture * 40).toFixed(2)),
       phosphorus: parseFloat((5 + soilMoisture * 20).toFixed(2)),
@@ -312,9 +314,7 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
       forecast,
     },
     vegetation: {
-      ndvi: parseFloat(
-        Math.min(0.9, Math.max(0.1, soilMoisture * 1.2 - (currentTemp > 30 ? 0.2 : 0))).toFixed(2)
-      ),
+      ndvi: parseFloat(ndvi.toFixed(2)),
     },
     lastUpdated: new Date().toISOString(),
   };
@@ -426,3 +426,5 @@ export async function getLocationData(
     }
   }
 }
+
+    
