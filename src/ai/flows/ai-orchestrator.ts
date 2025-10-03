@@ -154,31 +154,6 @@ function assessDataQuality(data: z.infer<typeof EnvironmentalDataSchema>): 'exce
   return 'poor';
 }
 
-// Retry wrapper for AI functions
-async function retryAICall<T>(
-  fn: () => Promise<T>,
-  name: string,
-  maxRetries = CONFIG.MAX_RETRIES
-): Promise<T | null> {
-  let lastError: Error | null = null;
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        console.log(`Retrying ${name} (attempt ${attempt + 1}/${maxRetries + 1})`);
-        await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY * attempt));
-      }
-      return await fn();
-    } catch (error) {
-      lastError = error as Error;
-      console.error(`${name} attempt ${attempt + 1} failed:`, error);
-    }
-  }
-  
-  console.error(`${name} failed after ${maxRetries + 1} attempts:`, lastError);
-  return null;
-}
-
 // Helper functions for data formatting (keeping existing ones)
 function formatSoilData(soil: z.infer<typeof SoilDataSchema>): string {
   return `Moisture: ${(soil.moisture * 100).toFixed(1)}%, Temperature: ${soil.temperature}°C, pH: ${soil.ph.toFixed(1)}, Nitrogen: ${soil.nitrogen}mg/kg, Phosphorus: ${soil.phosphorus}mg/kg, Potassium: ${soil.potassium}mg/kg`;
@@ -293,16 +268,24 @@ const orchestratorFlow = ai.defineFlow(
 
     try {
       const aiCalls = [
-        retryAICall(() => futureTrendPredictions({ location: locationName, historicalData: dataStrings.historical }), 'futureTrendPredictions'),
-        retryAICall(() => getCropRecommendations({ latitude: location.lat, longitude: location.lng, soilData: dataStrings.soil, weatherPatterns: dataStrings.weather }), 'getCropRecommendations'),
-        retryAICall(() => aiRiskAssessment({ airQuality: dataStrings.airQuality, fireData: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather }), 'aiRiskAssessment'),
-        retryAICall(() => getSimplifiedExplanation({ location: locationName, airQuality: dataStrings.airQuality, soilData: dataStrings.soil, fireDetection: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather, temperature: dataStrings.temperature, additionalMetrics: dataStrings.additionalMetrics }), 'getSimplifiedExplanation'),
-        retryAICall(() => aiEnvironmentalSolutions({ airQuality: dataStrings.airQuality, soilData: dataStrings.soil, fireDetection: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather, temperature: dataStrings.temperature }), 'aiEnvironmentalSolutions'),
-        retryAICall(() => healthAdvisory({ airQuality: dataStrings.airQuality, temperature: dataStrings.weather, fireData: dataStrings.fire }), 'healthAdvisory'),
+        futureTrendPredictions({ location: locationName, historicalData: dataStrings.historical }),
+        getCropRecommendations({ latitude: location.lat, longitude: location.lng, soilData: dataStrings.soil, weatherPatterns: dataStrings.weather }),
+        aiRiskAssessment({ airQuality: dataStrings.airQuality, fireData: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather }),
+        getSimplifiedExplanation({ location: locationName, airQuality: dataStrings.airQuality, soilData: dataStrings.soil, fireDetection: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather, temperature: dataStrings.temperature, additionalMetrics: dataStrings.additionalMetrics }),
+        aiEnvironmentalSolutions({ airQuality: dataStrings.airQuality, soilData: dataStrings.soil, fireDetection: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather, temperature: dataStrings.temperature }),
+        healthAdvisory({ airQuality: dataStrings.airQuality, temperature: dataStrings.weather, fireData: dataStrings.fire }),
       ];
 
-      const results = await Promise.all(aiCalls);
-      const [predictions, cropRecommendations, riskAssessment, simplifiedExplanation, environmentalSolutions, health] = results;
+      const results = await Promise.allSettled(aiCalls);
+      
+      const [
+        predictionsResult,
+        cropRecommendationsResult,
+        riskAssessmentResult,
+        simplifiedExplanationResult,
+        environmentalSolutionsResult,
+        healthResult
+      ] = results;
 
       const summary = generateSummary(locationName, environmentalData);
       
@@ -314,18 +297,30 @@ const orchestratorFlow = ai.defineFlow(
 
       const output: AIOrchestratorOutput = {
         summary,
-        futurePredictions: predictions?.predictions || 'Future trend analysis is temporarily unavailable.',
-        cropRecommendations: cropRecommendations?.cropRecommendations || 'Crop recommendations are being processed.',
-        riskAssessment: riskAssessment?.riskAssessment || 'Risk assessment in progress.',
-        simplifiedExplanation: simplifiedExplanation?.simplifiedExplanation || `Environmental conditions at ${locationName} are being analyzed.`,
-        environmentalSolutions: environmentalSolutions?.solutions || 'Environmental solutions are being formulated.',
-        healthAdvisory: health?.healthAdvisory || 'Health advisory is currently unavailable.',
+        futurePredictions: predictionsResult.status === 'fulfilled' 
+            ? predictionsResult.value.predictions 
+            : 'Future trend analysis is temporarily unavailable.',
+        cropRecommendations: cropRecommendationsResult.status === 'fulfilled' 
+            ? cropRecommendationsResult.value.cropRecommendations 
+            : 'Crop recommendations are being processed.',
+        riskAssessment: riskAssessmentResult.status === 'fulfilled' 
+            ? riskAssessmentResult.value.riskAssessment 
+            : 'Risk assessment in progress.',
+        simplifiedExplanation: simplifiedExplanationResult.status === 'fulfilled' 
+            ? simplifiedExplanationResult.value.simplifiedExplanation 
+            : `Environmental conditions at ${locationName} are being analyzed.`,
+        environmentalSolutions: environmentalSolutionsResult.status === 'fulfilled' 
+            ? environmentalSolutionsResult.value.solutions 
+            : 'Environmental solutions are being formulated.',
+        healthAdvisory: healthResult.status === 'fulfilled' 
+            ? healthResult.value.healthAdvisory 
+            : 'Health advisory is currently unavailable.',
         metadata: {
           generatedAt: new Date().toISOString(),
           processingTimeMs: processingTime,
           dataQuality,
           cacheable: dataQuality !== 'poor',
-          debugInfo: options.includeDebugInfo ? { location: locationName, dataStrings, aiResults: results.map(r => r ? 'success' : 'failed') } : undefined,
+          debugInfo: options.includeDebugInfo ? { location: locationName, dataStrings, aiResults: results.map(r => r.status) } : undefined,
         },
       };
 
@@ -354,7 +349,7 @@ const orchestratorFlow = ai.defineFlow(
         environmentalSolutions: 'Solution system is currently offline.',
         healthAdvisory: 'Health advisory system is currently offline.',
         metadata: {
-          generatedAt: new DatetoISOString(),
+          generatedAt: new Date().toISOString(),
           processingTimeMs: processingTime,
           dataQuality,
           cacheable: false,
