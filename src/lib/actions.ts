@@ -205,26 +205,53 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
   };
 }
 
+export async function reverseGeocode(location: Location): Promise<string | null> {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}&zoom=10&addressdetails=1`;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'EarthInsightsExplorer/1.0'
+      }
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.display_name) {
+      // Return a shorter name if possible
+      const { city, state, country } = data.address;
+      if (city) return `${city}, ${country}`;
+      if (state) return `${state}, ${country}`;
+      return data.display_name.split(',').slice(0, 3).join(',');
+    }
+    return null;
+  } catch (error) {
+    console.error("Reverse geocoding failed:", error);
+    return null;
+  }
+}
+
 // Mock geocoding
 export async function geocodeLocation(locationName: string): Promise<Location | null> {
-  await new Promise(resolve => setTimeout(resolve, 500));
   // In a real app, call a geocoding service.
-  // This is a very simplified mock.
-  if (locationName.toLowerCase().includes('new york')) {
-    return { lat: 40.7128, lng: -74.006, name: 'New York, USA' };
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(locationName)}&format=json&limit=1&addressdetails=1`;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'EarthInsightsExplorer/1.0'
+      }
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.length > 0) {
+      const { lat, lon, display_name } = data[0];
+      return { lat: parseFloat(lat), lng: parseFloat(lon), name: display_name };
+    }
+    return null;
+  } catch (error) {
+    console.error("Geocoding failed:", error);
+    return null;
   }
-  if (locationName.toLowerCase().includes('amazon')) {
-    return { lat: -3.4653, lng: -62.2159, name: 'Amazon Rainforest' };
-  }
-  if (locationName.toLowerCase().includes('sahara')) {
-    return { lat: 23.4162, lng: 25.6628, name: 'Sahara Desert' };
-  }
-  // Attempt to parse coordinates
-  const coords = locationName.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
-  if (coords) {
-    return { lat: parseFloat(coords[1]), lng: parseFloat(coords[2]), name: locationName };
-  }
-  return { lat: Math.random() * 180 - 90, lng: Math.random() * 360 - 180, name: locationName };
 }
 
 export async function getLocationData(location: Location): Promise<EnvironmentalData & AIInsights> {

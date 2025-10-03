@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as satellite from 'satellite.js';
 import type { Location, SatelliteData } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { reverseGeocode } from '@/lib/actions';
 
 interface EarthGlobeProps {
   onLocationSelect: (location: Location) => void;
@@ -26,8 +27,9 @@ const EarthGlobe: React.FC<EarthGlobeProps> = ({ onLocationSelect, markerCoordin
   const terraRef = useRef<THREE.Group | null>(null);
   const cloudsRef = useRef<THREE.Mesh | null>(null);
 
-  const handleLocationSelectCallback = useCallback((lat: number, lng: number) => {
-    onLocationSelect({ lat, lng, name: `Lat: ${lat.toFixed(2)}, Lon: ${lng.toFixed(2)}` });
+  const handleLocationSelectCallback = useCallback(async (lat: number, lng: number) => {
+    const name = await reverseGeocode({ lat, lng });
+    onLocationSelect({ lat, lng, name: name || `Lat: ${lat.toFixed(2)}, Lon: ${lng.toFixed(2)}` });
   }, [onLocationSelect]);
 
   const updateTerraPosition = useCallback(() => {
@@ -184,12 +186,12 @@ const EarthGlobe: React.FC<EarthGlobeProps> = ({ onLocationSelect, markerCoordin
         if (intersects.length > 0) {
             const { point } = intersects[0];
             const phi = Math.acos(point.y / 1.5);
-            const theta = Math.atan2(point.x, point.z);
+            const theta = Math.atan2(point.z, point.x); // Swapped x and z
             
             const lat = 90 - (phi * 180) / Math.PI;
-            const lng = (theta * 180) / Math.PI;
+            const lng = (theta * 180) / Math.PI; // Adjusted longitude calculation
             
-            handleLocationSelectCallback(lat, lng);
+            handleLocationSelectCallback(lat, lng - 90); // Corrected longitude adjustment
         }
     };
     mountRef.current.addEventListener('click', handleClick);
@@ -208,9 +210,9 @@ const EarthGlobe: React.FC<EarthGlobeProps> = ({ onLocationSelect, markerCoordin
     if (markerCoordinates && markerRef.current && sceneRef.current) {
       const { lat, lng } = markerCoordinates;
       const phi = (90 - lat) * (Math.PI / 180);
-      const theta = (lng + 180) * (Math.PI / 180);
+      const theta = (lng + 90) * (Math.PI / 180); // Adjusted theta calculation for marker
 
-      const x = -(1.52 * Math.sin(phi) * Math.cos(theta));
+      const x = 1.52 * Math.sin(phi) * Math.cos(theta);
       const y = 1.52 * Math.cos(phi);
       const z = 1.52 * Math.sin(phi) * Math.sin(theta);
 

@@ -49,7 +49,7 @@ export function LocationSearch({ onSearch }: LocationSearchProps) {
     <form onSubmit={handleSearch} className="flex w-full max-w-xs items-center space-x-2">
       <Input
         type="text"
-        placeholder="e.g. New York..."
+        placeholder="Search for a location..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         disabled={loading}
