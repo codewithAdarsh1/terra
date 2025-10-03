@@ -109,7 +109,7 @@ const EarthGlobe: React.FC<EarthGlobeProps> = ({ onLocationSelect, markerCoordin
     scene.add(earth);
 
     // Clouds
-    const cloudTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-clouds.png');
+    const cloudTexture = textureLoader.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-clouds.png');
     const cloudGeometry = new THREE.SphereGeometry(1.52, 64, 64);
     const cloudMaterial = new THREE.MeshLambertMaterial({ map: cloudTexture, transparent: true, opacity: 0.3 });
     const clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
@@ -228,3 +228,5 @@ const EarthGlobe: React.FC<EarthGlobeProps> = ({ onLocationSelect, markerCoordin
 };
 
 export default EarthGlobe;
+
+    
