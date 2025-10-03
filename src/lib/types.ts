@@ -62,6 +62,7 @@ export type AIInsights = {
   environmentalSolutions: string;
   riskAssessment: string;
   simplifiedExplanation: string;
+  healthAdvisory: string;
 };
 
 export type SatelliteData = {

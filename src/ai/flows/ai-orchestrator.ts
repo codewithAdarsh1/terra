@@ -17,6 +17,7 @@ import { futureTrendPredictions } from './ai-future-trend-predictions';
 import { aiRiskAssessment } from './ai-risk-assessment';
 import { getSimplifiedExplanation } from '../ai-simplified-data-explanations';
 import { aiEnvironmentalSolutions } from '../ai-environmental-solutions';
+import { healthAdvisory } from './ai-health-advisory';
 
 // Configuration constants
 const CONFIG = {
@@ -113,6 +114,7 @@ const OrchestratorOutputSchema = z.object({
   riskAssessment: z.string().describe('Environmental risk assessment'),
   simplifiedExplanation: z.string().describe('Simplified explanation for general audience'),
   environmentalSolutions: z.string().describe('Recommended environmental solutions'),
+  healthAdvisory: z.string().describe('AI-powered health advisory'),
   metadata: z.object({
     generatedAt: z.string().datetime(),
     processingTimeMs: z.number(),
@@ -296,10 +298,11 @@ const orchestratorFlow = ai.defineFlow(
         retryAICall(() => aiRiskAssessment({ airQuality: dataStrings.airQuality, fireData: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather }), 'aiRiskAssessment'),
         retryAICall(() => getSimplifiedExplanation({ location: locationName, airQuality: dataStrings.airQuality, soilData: dataStrings.soil, fireDetection: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather, temperature: dataStrings.temperature, additionalMetrics: dataStrings.additionalMetrics }), 'getSimplifiedExplanation'),
         retryAICall(() => aiEnvironmentalSolutions({ airQuality: dataStrings.airQuality, soilData: dataStrings.soil, fireDetection: dataStrings.fire, waterResources: dataStrings.water, weatherPatterns: dataStrings.weather, temperature: dataStrings.temperature }), 'aiEnvironmentalSolutions'),
+        retryAICall(() => healthAdvisory({ airQuality: dataStrings.airQuality, temperature: dataStrings.weather, fireData: dataStrings.fire }), 'healthAdvisory'),
       ];
 
       const results = await Promise.all(aiCalls);
-      const [predictions, cropRecommendations, riskAssessment, simplifiedExplanation, environmentalSolutions] = results;
+      const [predictions, cropRecommendations, riskAssessment, simplifiedExplanation, environmentalSolutions, health] = results;
 
       const summary = generateSummary(locationName, environmentalData);
       
@@ -316,6 +319,7 @@ const orchestratorFlow = ai.defineFlow(
         riskAssessment: riskAssessment?.riskAssessment || 'Risk assessment in progress.',
         simplifiedExplanation: simplifiedExplanation?.simplifiedExplanation || `Environmental conditions at ${locationName} are being analyzed.`,
         environmentalSolutions: environmentalSolutions?.solutions || 'Environmental solutions are being formulated.',
+        healthAdvisory: health?.healthAdvisory || 'Health advisory is currently unavailable.',
         metadata: {
           generatedAt: new Date().toISOString(),
           processingTimeMs: processingTime,
@@ -348,6 +352,7 @@ const orchestratorFlow = ai.defineFlow(
         riskAssessment: 'Risk assessment system is currently offline.',
         simplifiedExplanation: 'Explanation system is currently offline.',
         environmentalSolutions: 'Solution system is currently offline.',
+        healthAdvisory: 'Health advisory system is currently offline.',
         metadata: {
           generatedAt: new Date().toISOString(),
           processingTimeMs: processingTime,

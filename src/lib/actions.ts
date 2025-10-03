@@ -99,7 +99,7 @@ async function fetchNasaPowerData(location: Location): Promise<NasaPowerResponse
 }
 
 // Fetch active fire data from NASA FIRMS (uses MODIS on Terra)
-async function fetchFireData(location: Location): Promise<{ activeFires: number; fireRisk: 'low' | 'medium' | 'high' | 'very-high' }> {
+async function fetchFireData(location: Location): Promise<{ activeFires: number; fireRisk: 'low' | 'medium' | 'high' | 'very-high' | 'unknown' }> {
   const apiKey = process.env.FIRMS_API_KEY;
   if (!apiKey) {
     console.warn('FIRMS_API_KEY is not set. Using mock fire data.');
@@ -340,6 +340,7 @@ export async function getLocationData(
       riskAssessment: 'Unable to assess risks.',
       simplifiedExplanation: 'Unable to generate explanation.',
       environmentalSolutions: 'Unable to generate solutions.',
+      healthAdvisory: 'Unable to generate health advisory.'
     };
   }
 }

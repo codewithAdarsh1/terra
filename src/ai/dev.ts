@@ -7,3 +7,4 @@ import '@/ai/flows/ai-risk-assessment.ts';
 import '@/ai/ai-environmental-solutions.ts';
 import '@/ai/ai-simplified-data-explanations.ts';
 import '@/ai/flows/ai-orchestrator.ts';
+import '@/ai/flows/ai-health-advisory.ts';
