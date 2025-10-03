@@ -15,7 +15,7 @@ export type AIRiskAssessmentOutput = z.infer<typeof AIRiskAssessmentOutputSchema
 
 const prompt = ai.definePrompt({
   name: 'aiRiskAssessmentPrompt',
-  model: 'googleai/gemini-1.5-pro-latest',
+  model: 'googleai/gemini-pro',
   input: {schema: z.any()},
   output: {schema: AIRiskAssessmentOutputSchema},
   prompt: `You are an AI assistant that specializes in environmental risk assessment using data from NASA's Terra satellite.

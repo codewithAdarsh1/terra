@@ -16,7 +16,7 @@ export type HealthAdvisoryOutput = z.infer<typeof HealthAdvisoryOutputSchema>;
 
 const prompt = ai.definePrompt({
   name: 'healthAdvisoryPrompt',
-  model: 'googleai/gemini-1.5-pro-latest',
+  model: 'googleai/gemini-pro',
   input: {schema: z.any()},
   output: {schema: HealthAdvisoryOutputSchema},
   prompt: `You are a public health expert providing advice based on environmental data from NASA satellites for the location: {{location.name}}.

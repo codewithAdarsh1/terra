@@ -14,7 +14,7 @@ export type CropRecommendationsOutput = z.infer<typeof CropRecommendationsOutput
 
 const prompt = ai.definePrompt({
   name: 'cropRecommendationsPrompt',
-  model: 'googleai/gemini-1.5-pro-latest',
+  model: 'googleai/gemini-pro',
   input: { schema: z.any() },
   output: {schema: CropRecommendationsOutputSchema},
   prompt: `You are an expert agricultural advisor. Based on the provided environmental data for a specific location, you will provide crop recommendations.

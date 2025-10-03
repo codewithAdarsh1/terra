@@ -16,7 +16,7 @@ export type AIEnvironmentalSolutionsOutput = z.infer<typeof AIEnvironmentalSolut
 
 const prompt = ai.definePrompt({
   name: 'aiEnvironmentalSolutionsPrompt',
-  model: 'googleai/gemini-1.5-pro-latest',
+  model: 'googleai/gemini-pro',
   input: {schema: z.any()},
   output: {schema: AIEnvironmentalSolutionsOutputSchema},
   prompt: `You are an AI assistant that suggests actionable environmental solutions based on the analyzed satellite data for a location.
