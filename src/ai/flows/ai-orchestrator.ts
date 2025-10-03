@@ -2,8 +2,12 @@
 /**
  * @fileOverview Master AI orchestrator that coordinates all AI insights generation for environmental data.
  * 
- * - aiInsightsOrchestrator - Main orchestrator flow that calls all other AI flows
- * - Handles data shaping and parallel execution of AI insights
+ * Enhanced with:
+ * - Retry logic for failed AI calls
+ * - Performance monitoring
+ * - Caching support
+ * - Detailed logging and tracing
+ * - Validation and data quality checks
  */
 
 import { ai } from '@/ai/genkit';
@@ -15,40 +19,58 @@ import { aiRiskAssessment } from './ai-risk-assessment';
 import { getSimplifiedExplanation } from '../ai-simplified-data-explanations';
 import { aiEnvironmentalSolutions } from '../ai-environmental-solutions';
 
-// Input Schemas
+// Configuration constants
+const CONFIG = {
+  MAX_RETRIES: 2,
+  RETRY_DELAY: 1000, // ms
+  CACHE_TTL: 300000, // 5 minutes in ms
+  PERFORMANCE_THRESHOLD: 5000, // ms - log warning if execution takes longer
+  DATA_QUALITY_THRESHOLDS: {
+    MIN_VALID_READINGS: 0.7, // 70% of data should be valid
+    MAX_DATA_AGE_HOURS: 24,
+  },
+} as const;
+
+// Enhanced schemas with stricter validation
 const LocationSchema = z.object({
-  lat: z.number().describe('Latitude of the location'),
-  lng: z.number().describe('Longitude of the location'),
+  lat: z.number().min(-90).max(90).describe('Latitude of the location'),
+  lng: z.number().min(-180).max(180).describe('Longitude of the location'),
   name: z.string().optional().describe('Name of the location'),
 });
 
 const AirQualitySchema = z.object({
-  aqi: z.number().describe('Air Quality Index'),
-  pm25: z.number().describe('PM2.5 levels'),
-  pm10: z.number().describe('PM10 levels'),
-  o3: z.number().describe('Ozone levels'),
-  no2: z.number().describe('Nitrogen dioxide levels'),
-  so2: z.number().describe('Sulfur dioxide levels'),
-  co: z.number().describe('Carbon monoxide levels'),
+  aqi: z.number().min(0).max(500).describe('Air Quality Index'),
+  pm25: z.number().min(0).describe('PM2.5 levels'),
+  pm10: z.number().min(0).describe('PM10 levels'),
+  o3: z.number().min(0).describe('Ozone levels'),
+  no2: z.number().min(0).describe('Nitrogen dioxide levels'),
+  so2: z.number().min(0).describe('Sulfur dioxide levels'),
+  co: z.number().min(0).describe('Carbon monoxide levels'),
 });
 
 const SoilDataSchema = z.object({
-  moisture: z.number().describe('Soil moisture level'),
-  temperature: z.number().describe('Soil temperature in Celsius'),
-  ph: z.number().describe('Soil pH level'),
-  nitrogen: z.number().describe('Nitrogen content'),
-  phosphorus: z.number().describe('Phosphorus content'),
-  potassium: z.number().describe('Potassium content'),
+  moisture: z.number().min(0).max(1).describe('Soil moisture level (0-1)'),
+  temperature: z.number().min(-50).max(60).describe('Soil temperature in Celsius'),
+  ph: z.number().min(0).max(14).describe('Soil pH level'),
+  nitrogen: z.number().min(0).describe('Nitrogen content'),
+  phosphorus: z.number().min(0).describe('Phosphorus content'),
+  potassium: z.number().min(0).describe('Potassium content'),
 });
 
 const FireDataSchema = z.object({
-  activeFires: z.number().describe('Number of active fires'),
-  fireRisk: z.union([z.literal('low'), z.literal('medium'), z.literal('high'), z.literal('very-high'), z.literal('unknown')]),
+  activeFires: z.number().min(0).describe('Number of active fires'),
+  fireRisk: z.union([
+    z.literal('low'),
+    z.literal('medium'),
+    z.literal('high'),
+    z.literal('very-high'),
+    z.literal('unknown')
+  ]).describe('Fire risk level'),
 });
 
 const WaterDataSchema = z.object({
-  surfaceWater: z.number().describe('Surface water percentage'),
-  precipitation: z.number().describe('Precipitation in mm'),
+  surfaceWater: z.number().min(0).max(1).describe('Surface water percentage (0-1)'),
+  precipitation: z.number().min(0).describe('Precipitation in mm'),
 });
 
 const WeatherForecastSchema = z.object({
@@ -60,12 +82,12 @@ const WeatherForecastSchema = z.object({
 });
 
 const WeatherDataSchema = z.object({
-  currentTemp: z.number().describe('Current temperature in Celsius'),
+  currentTemp: z.number().min(-60).max(60).describe('Current temperature in Celsius'),
   forecast: z.array(WeatherForecastSchema).describe('5-day weather forecast'),
 });
 
 const VegetationDataSchema = z.object({
-  ndvi: z.number().describe('Normalized Difference Vegetation Index'),
+  ndvi: z.number().min(-1).max(1).describe('Normalized Difference Vegetation Index'),
 });
 
 const EnvironmentalDataSchema = z.object({
@@ -75,12 +97,17 @@ const EnvironmentalDataSchema = z.object({
   water: WaterDataSchema,
   weather: WeatherDataSchema,
   vegetation: VegetationDataSchema,
-  lastUpdated: z.string().describe('ISO timestamp of last data update'),
+  lastUpdated: z.string().datetime().describe('ISO timestamp of last data update'),
 });
 
 const OrchestratorInputSchema = z.object({
   location: LocationSchema,
   environmentalData: EnvironmentalDataSchema,
+  options: z.object({
+    skipCache: z.boolean().optional().describe('Skip cache and force fresh AI generation'),
+    priority: z.enum(['normal', 'high']).optional().default('normal').describe('Processing priority'),
+    includeDebugInfo: z.boolean().optional().default(false).describe('Include debug information'),
+  }).optional(),
 });
 
 export type AIOrchestratorInput = z.infer<typeof OrchestratorInputSchema>;
@@ -92,13 +119,73 @@ const OrchestratorOutputSchema = z.object({
   riskAssessment: z.string().describe('Environmental risk assessment'),
   simplifiedExplanation: z.string().describe('Simplified explanation for general audience'),
   environmentalSolutions: z.string().describe('Recommended environmental solutions'),
+  metadata: z.object({
+    generatedAt: z.string().datetime(),
+    processingTimeMs: z.number(),
+    dataQuality: z.enum(['excellent', 'good', 'fair', 'poor']),
+    cacheable: z.boolean(),
+    debugInfo: z.any().optional(),
+  }).optional(),
 });
 
 export type AIOrchestratorOutput = z.infer<typeof OrchestratorOutputSchema>;
 
-// Helper functions for data formatting
+// Simple in-memory cache (consider Redis for production)
+const cache = new Map<string, { data: AIOrchestratorOutput; timestamp: number }>();
+
+// Helper function to generate cache key
+function getCacheKey(location: z.infer<typeof LocationSchema>, data: z.infer<typeof EnvironmentalDataSchema>): string {
+  return `${location.lat.toFixed(4)}_${location.lng.toFixed(4)}_${data.lastUpdated}`;
+}
+
+// Helper function to validate data quality
+function assessDataQuality(data: z.infer<typeof EnvironmentalDataSchema>): 'excellent' | 'good' | 'fair' | 'poor' {
+  const checks = [
+    data.airQuality.aqi >= 0 && data.airQuality.aqi <= 500,
+    data.soil.moisture >= 0 && data.soil.moisture <= 1,
+    data.vegetation.ndvi >= -1 && data.vegetation.ndvi <= 1,
+    data.fire.fireRisk !== 'unknown',
+    new Date(data.lastUpdated).getTime() > Date.now() - CONFIG.DATA_QUALITY_THRESHOLDS.MAX_DATA_AGE_HOURS * 3600000,
+  ];
+  
+  const validChecks = checks.filter(Boolean).length;
+  const totalChecks = checks.length;
+  const validRatio = validChecks / totalChecks;
+  
+  if (validRatio >= 0.9) return 'excellent';
+  if (validRatio >= 0.7) return 'good';
+  if (validRatio >= 0.5) return 'fair';
+  return 'poor';
+}
+
+// Retry wrapper for AI functions
+async function retryAICall<T>(
+  fn: () => Promise<T>,
+  name: string,
+  maxRetries = CONFIG.MAX_RETRIES
+): Promise<T | null> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`Retrying ${name} (attempt ${attempt + 1}/${maxRetries + 1})`);
+        await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY * attempt));
+      }
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`${name} attempt ${attempt + 1} failed:`, error);
+    }
+  }
+  
+  console.error(`${name} failed after ${maxRetries + 1} attempts:`, lastError);
+  return null;
+}
+
+// Helper functions for data formatting (keeping existing ones)
 function formatSoilData(soil: z.infer<typeof SoilDataSchema>): string {
-  return `Moisture: ${(soil.moisture * 100).toFixed(1)}%, Temperature: ${soil.temperature}°C, pH: ${soil.ph}, Nitrogen: ${soil.nitrogen}mg/kg, Phosphorus: ${soil.phosphorus}mg/kg, Potassium: ${soil.potassium}mg/kg`;
+  return `Moisture: ${(soil.moisture * 100).toFixed(1)}%, Temperature: ${soil.temperature}°C, pH: ${soil.ph.toFixed(1)}, Nitrogen: ${soil.nitrogen}mg/kg, Phosphorus: ${soil.phosphorus}mg/kg, Potassium: ${soil.potassium}mg/kg`;
 }
 
 function formatWeatherData(
@@ -165,8 +252,7 @@ function generateSummary(locationName: string, data: z.infer<typeof Environmenta
          `Recent precipitation totals ${data.water.precipitation}mm with current temperature at ${data.weather.currentTemp}°C.`;
 }
 
-
-// Main orchestrator flow
+// Main orchestrator flow with enhanced features
 const orchestratorFlow = ai.defineFlow(
   {
     name: 'aiInsightsOrchestratorFlow',
@@ -174,7 +260,32 @@ const orchestratorFlow = ai.defineFlow(
     outputSchema: OrchestratorOutputSchema,
   },
   async (input) => {
-    const { location, environmentalData } = input;
+    const startTime = Date.now();
+    const { location, environmentalData, options = {} } = input;
+    
+    // Check cache first (unless skipCache is true)
+    if (!options.skipCache) {
+      const cacheKey = getCacheKey(location, environmentalData);
+      const cached = cache.get(cacheKey);
+      
+      if (cached && Date.now() - cached.timestamp < CONFIG.CACHE_TTL) {
+        console.log(`Cache hit for ${cacheKey}`);
+        return {
+          ...cached.data,
+          metadata: {
+            ...cached.data.metadata,
+            processingTimeMs: Date.now() - startTime,
+            debugInfo: options.includeDebugInfo ? { cacheHit: true, cacheKey } : undefined,
+          },
+        };
+      }
+    }
+    
+    // Assess data quality
+    const dataQuality = assessDataQuality(environmentalData);
+    if (dataQuality === 'poor' && options.priority !== 'high') {
+      console.warn('Data quality is poor, results may be unreliable');
+    }
     
     // Prepare location name
     const locationName = location.name || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`;
@@ -192,96 +303,117 @@ const orchestratorFlow = ai.defineFlow(
     };
 
     try {
-      // Execute all AI flows in parallel
+      // Execute all AI flows in parallel with retry logic
+      const aiCalls = [
+        retryAICall(
+          () => futureTrendPredictions({
+            location: locationName,
+            historicalData: dataStrings.historical,
+          }),
+          'futureTrendPredictions'
+        ),
+        retryAICall(
+          () => getCropRecommendations({
+            latitude: location.lat,
+            longitude: location.lng,
+            soilData: dataStrings.soil,
+            weatherPatterns: dataStrings.weather,
+          }),
+          'getCropRecommendations'
+        ),
+        retryAICall(
+          () => aiRiskAssessment({
+            airQuality: dataStrings.airQuality,
+            fireData: dataStrings.fire,
+            waterResources: dataStrings.water,
+            weatherPatterns: dataStrings.weather,
+          }),
+          'aiRiskAssessment'
+        ),
+        retryAICall(
+          () => getSimplifiedExplanation({
+            location: locationName,
+            airQuality: dataStrings.airQuality,
+            soilData: dataStrings.soil,
+            fireDetection: dataStrings.fire,
+            waterResources: dataStrings.water,
+            weatherPatterns: dataStrings.weather,
+            temperature: dataStrings.temperature,
+            additionalMetrics: dataStrings.additionalMetrics,
+          }),
+          'getSimplifiedExplanation'
+        ),
+        retryAICall(
+          () => aiEnvironmentalSolutions({
+            airQuality: dataStrings.airQuality,
+            soilData: dataStrings.soil,
+            fireDetection: dataStrings.fire,
+            waterResources: dataStrings.water,
+            weatherPatterns: dataStrings.weather,
+            temperature: dataStrings.temperature,
+          }),
+          'aiEnvironmentalSolutions'
+        ),
+      ];
+
+      const results = await Promise.all(aiCalls);
       const [
         predictions,
         cropRecommendations,
         riskAssessment,
         simplifiedExplanation,
         environmentalSolutions,
-      ] = await Promise.allSettled([
-        futureTrendPredictions({
-          location: locationName,
-          historicalData: dataStrings.historical,
-        }),
-        getCropRecommendations({
-          latitude: location.lat,
-          longitude: location.lng,
-          soilData: dataStrings.soil,
-          weatherPatterns: dataStrings.weather,
-        }),
-        aiRiskAssessment({
-          airQuality: dataStrings.airQuality,
-          fireData: dataStrings.fire,
-          waterResources: dataStrings.water,
-          weatherPatterns: dataStrings.weather,
-        }),
-        getSimplifiedExplanation({
-          location: locationName,
-          airQuality: dataStrings.airQuality,
-          soilData: dataStrings.soil,
-          fireDetection: dataStrings.fire,
-          waterResources: dataStrings.water,
-          weatherPatterns: dataStrings.weather,
-          temperature: dataStrings.temperature,
-          additionalMetrics: dataStrings.additionalMetrics,
-        }),
-        aiEnvironmentalSolutions({
-          airQuality: dataStrings.airQuality,
-          soilData: dataStrings.soil,
-          fireDetection: dataStrings.fire,
-          waterResources: dataStrings.water,
-          weatherPatterns: dataStrings.weather,
-          temperature: dataStrings.temperature,
-        }),
-      ]);
-
-      // Extract results with fallbacks for failed promises
-      const getResultOrFallback = <T extends { [key: string]: string }>(
-        result: PromiseSettledResult<T>,
-        fallbackKey: string,
-        fallbackMessage: string
-      ): string => {
-        if (result.status === 'fulfilled' && result.value[fallbackKey]) {
-          return result.value[fallbackKey];
-        }
-        console.error(`Failed to get ${fallbackKey}:`, result.status === 'rejected' ? result.reason : 'No data');
-        return fallbackMessage;
-      };
+      ] = results;
 
       // Generate comprehensive summary
       const summary = generateSummary(locationName, environmentalData);
+      
+      const processingTime = Date.now() - startTime;
+      
+      // Log performance warning if needed
+      if (processingTime > CONFIG.PERFORMANCE_THRESHOLD) {
+        console.warn(`Orchestrator took ${processingTime}ms to complete (threshold: ${CONFIG.PERFORMANCE_THRESHOLD}ms)`);
+      }
 
-      return {
+      const output: AIOrchestratorOutput = {
         summary,
-        futurePredictions: getResultOrFallback(
-          predictions,
-          'predictions',
-          'Future trend analysis is temporarily unavailable. Please check back later.'
-        ),
-        cropRecommendations: getResultOrFallback(
-          cropRecommendations,
-          'cropRecommendations',
-          'Crop recommendations are being processed. Default suggestion: Consider drought-resistant varieties based on current conditions.'
-        ),
-        riskAssessment: getResultOrFallback(
-          riskAssessment,
-          'riskAssessment',
-          'Risk assessment in progress. Monitor fire and air quality alerts for your area.'
-        ),
-        simplifiedExplanation: getResultOrFallback(
-          simplifiedExplanation,
-          'simplifiedExplanation',
-          `The environmental conditions at ${locationName} are being analyzed. Key metrics are within expected ranges.`
-        ),
-        environmentalSolutions: getResultOrFallback(
-          environmentalSolutions,
-          'solutions',
-          'Environmental solutions are being formulated based on current conditions.'
-        ),
+        futurePredictions: predictions?.predictions || 'Future trend analysis is temporarily unavailable.',
+        cropRecommendations: cropRecommendations?.cropRecommendations || 'Crop recommendations are being processed.',
+        riskAssessment: riskAssessment?.riskAssessment || 'Risk assessment in progress.',
+        simplifiedExplanation: simplifiedExplanation?.simplifiedExplanation || `Environmental conditions at ${locationName} are being analyzed.`,
+        environmentalSolutions: environmentalSolutions?.solutions || 'Environmental solutions are being formulated.',
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          processingTimeMs: processingTime,
+          dataQuality,
+          cacheable: dataQuality !== 'poor',
+          debugInfo: options.includeDebugInfo ? {
+            location: locationName,
+            dataStrings,
+            aiResults: results.map(r => r ? 'success' : 'failed'),
+          } : undefined,
+        },
       };
+
+      // Cache the result if data quality is acceptable
+      if (dataQuality !== 'poor' && !options.skipCache) {
+        const cacheKey = getCacheKey(location, environmentalData);
+        cache.set(cacheKey, { data: output, timestamp: Date.now() });
+        
+        // Clean up old cache entries
+        if (cache.size > 100) {
+          const oldestKey = Array.from(cache.entries())
+            .sort(([, a], [, b]) => a.timestamp - b.timestamp)[0][0];
+          cache.delete(oldestKey);
+        }
+      }
+
+      return output;
     } catch (error) {
       console.error('Critical error in AI orchestrator:', error);
+      
+      const processingTime = Date.now() - startTime;
+      
       return {
         summary: generateSummary(locationName, environmentalData),
         futurePredictions: 'Analysis system is currently offline.',
@@ -289,12 +421,37 @@ const orchestratorFlow = ai.defineFlow(
         riskAssessment: 'Risk assessment system is currently offline.',
         simplifiedExplanation: 'Explanation system is currently offline.',
         environmentalSolutions: 'Solution system is currently offline.',
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          processingTimeMs: processingTime,
+          dataQuality,
+          cacheable: false,
+          debugInfo: options.includeDebugInfo ? { error: String(error) } : undefined,
+        },
       };
     }
   }
 );
 
-
+// Export the main orchestrator function
 export async function aiInsightsOrchestrator(input: AIOrchestratorInput): Promise<AIOrchestratorOutput> {
   return orchestratorFlow(input);
+}
+
+// Optional: Export a function to clear the cache
+export async function clearOrchestratorCache(): Promise<void> {
+  cache.clear();
+  console.log('Orchestrator cache cleared');
+}
+
+// Optional: Export cache statistics
+export async function getOrchestratorCacheStats() {
+  return {
+    size: cache.size,
+    entries: Array.from(cache.entries()).map(([key, value]) => ({
+      key,
+      age: Date.now() - value.timestamp,
+      dataQuality: value.data.metadata?.dataQuality,
+    })),
+  };
 }
