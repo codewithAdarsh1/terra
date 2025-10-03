@@ -1,7 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { EnvironmentalData, Location } from "@/lib/types";
 import { Thermometer, Wind, Droplets, Flame, Trees, TestTube2, CloudCog } from "lucide-react";
-import { format } from "date-fns";
 import { DownloadReportButton } from "./DownloadReportButton";
 import { cn } from "@/lib/utils";
 import { WeatherChart } from "./WeatherChart";
@@ -23,7 +22,7 @@ export function EnvironmentalDataDashboard({ data, location }: EnvironmentalData
       <CardHeader className="flex flex-row items-start justify-between">
         <div>
           <CardTitle className="text-2xl">{location.name || `Lat: ${location.lat.toFixed(2)}, Lon: ${location.lng.toFixed(2)}`}</CardTitle>
-          <CardDescription>Last Updated: {format(new Date(data.lastUpdated), "PPP p")}</CardDescription>
+          <CardDescription>Last Updated: {data.lastUpdated}</CardDescription>
         </div>
         <DownloadReportButton reportId="report-content" locationName={location.name || 'selected-area'} />
       </CardHeader>

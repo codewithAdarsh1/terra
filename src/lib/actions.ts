@@ -2,6 +2,7 @@
 
 import { aiInsightsOrchestrator } from '@/ai/flows/ai-orchestrator';
 import type { Location, EnvironmentalData, AIInsights, AirQualityData } from './types';
+import { format } from "date-fns";
 
 // Constants
 const CONSTANTS = {
@@ -312,6 +313,7 @@ export async function getLocationData(
     return {
       ...environmentalData,
       ...aiInsights,
+      lastUpdated: format(new Date(environmentalData.lastUpdated), "PPP p"),
     };
   } catch (error) {
     console.error('Error in getLocationData:', error);
@@ -327,7 +329,8 @@ export async function getLocationData(
       riskAssessment: 'Unable to assess risks.',
       simplifiedExplanation: 'Unable to generate explanation.',
       environmentalSolutions: 'Unable to generate solutions.',
-      healthAdvisory: 'Unable to generate health advisory.'
+      healthAdvisory: 'Unable to generate health advisory.',
+      lastUpdated: format(new Date(environmentalData.lastUpdated), "PPP p"),
     };
   }
 }

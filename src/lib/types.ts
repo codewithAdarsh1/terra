@@ -53,7 +53,7 @@ export type EnvironmentalData = {
   water: WaterData;
   weather: WeatherData;
   vegetation: VegetationData;
-  lastUpdated: string;
+  lastUpdated: string; // Changed from Date to string
 };
 
 export type AIInsights = {
