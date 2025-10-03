@@ -4,6 +4,7 @@ import { Thermometer, Wind, Droplets, Flame, Trees, TestTube2 } from "lucide-rea
 import { format } from "date-fns";
 import { DownloadReportButton } from "./DownloadReportButton";
 import { cn } from "@/lib/utils";
+import { WeatherChart } from "./WeatherChart";
 
 interface EnvironmentalDataDashboardProps {
   data: EnvironmentalData;
@@ -27,51 +28,61 @@ export function EnvironmentalDataDashboard({ data, location }: EnvironmentalData
         </div>
         <DownloadReportButton reportId="report-content" locationName={location.name || 'selected-area'} />
       </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <DataCard
-          icon={<Wind className="h-6 w-6 text-muted-foreground" />}
-          title="Air Quality Index"
-          value={data.airQuality.aqi}
-          unit=""
-          description={`PM2.5: ${data.airQuality.pm25}`}
-          valueClassName={getAqiColor(data.airQuality.aqi)}
-        />
-        <DataCard
-          icon={<Thermometer className="h-6 w-6 text-muted-foreground" />}
-          title="Avg. Soil Temp"
-          value={data.soil.temperature}
-          unit="°C"
-          description={`Moisture: ${(data.soil.moisture * 100).toFixed(0)}%`}
-        />
-        <DataCard
-          icon={<Droplets className="h-6 w-6 text-muted-foreground" />}
-          title="Precipitation"
-          value={data.water.precipitation}
-          unit="mm"
-          description={`Surface Water: ${(data.water.surfaceWater * 100).toFixed(0)}%`}
-        />
-         <DataCard
-          icon={<Flame className="h-6 w-6 text-muted-foreground" />}
-          title="Active Fires"
-          value={data.fire.activeFires}
-          unit=""
-          description={`Risk: ${data.fire.fireRisk}`}
-          valueClassName={data.fire.fireRisk === 'high' || data.fire.fireRisk === 'very-high' ? 'text-destructive' : ''}
-        />
-        <DataCard
-          icon={<Trees className="h-6 w-6 text-muted-foreground" />}
-          title="Vegetation Index"
-          value={data.vegetation.ndvi}
-          unit="NDVI"
-          description={data.vegetation.ndvi > 0.6 ? "Dense Vegetation" : "Sparse Vegetation"}
-        />
-         <DataCard
-          icon={<TestTube2 className="h-6 w-6 text-muted-foreground" />}
-          title="Soil pH"
-          value={data.soil.ph}
-          unit=""
-          description={`N: ${data.soil.nitrogen} P: ${data.soil.phosphorus} K: ${data.soil.potassium}`}
-        />
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <DataCard
+            icon={<Wind className="h-6 w-6 text-muted-foreground" />}
+            title="Air Quality Index"
+            value={data.airQuality.aqi}
+            unit=""
+            description={`PM2.5: ${data.airQuality.pm25}`}
+            valueClassName={getAqiColor(data.airQuality.aqi)}
+          />
+          <DataCard
+            icon={<Thermometer className="h-6 w-6 text-muted-foreground" />}
+            title="Avg. Soil Temp"
+            value={data.soil.temperature}
+            unit="°C"
+            description={`Moisture: ${(data.soil.moisture * 100).toFixed(0)}%`}
+          />
+          <DataCard
+            icon={<Droplets className="h-6 w-6 text-muted-foreground" />}
+            title="Precipitation"
+            value={data.water.precipitation}
+            unit="mm"
+            description={`Surface Water: ${(data.water.surfaceWater * 100).toFixed(0)}%`}
+          />
+          <DataCard
+            icon={<Flame className="h-6 w-6 text-muted-foreground" />}
+            title="Active Fires"
+            value={data.fire.activeFires}
+            unit=""
+            description={`Risk: ${data.fire.fireRisk}`}
+            valueClassName={data.fire.fireRisk === 'high' || data.fire.fireRisk === 'very-high' ? 'text-destructive' : ''}
+          />
+          <DataCard
+            icon={<Trees className="h-6 w-6 text-muted-foreground" />}
+            title="Vegetation Index"
+            value={data.vegetation.ndvi}
+            unit="NDVI"
+            description={data.vegetation.ndvi > 0.6 ? "Dense Vegetation" : "Sparse Vegetation"}
+          />
+          <DataCard
+            icon={<TestTube2 className="h-6 w-6 text-muted-foreground" />}
+            title="Soil pH"
+            value={data.soil.ph}
+            unit=""
+            description={`N: ${data.soil.nitrogen} P: ${data.soil.phosphorus} K: ${data.soil.potassium}`}
+          />
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Weather Forecast</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <WeatherChart data={data.weather.forecast} />
+          </CardContent>
+        </Card>
       </CardContent>
     </Card>
   )

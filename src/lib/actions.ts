@@ -24,21 +24,18 @@ async function fetchNasaPowerData(location: Location) {
     'WS10M', // Wind Speed at 10 meters
   ].join(',');
   
-  // Fetch data for the last 30 days to get a recent average
+  // Fetch data for the last 7 days to get a recent forecast
   const endDate = new Date();
+  endDate.setDate(endDate.getDate() + 2);
   const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 30);
+  startDate.setDate(endDate.getDate() - 6);
   
   const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
 
   const apiUrl = `${baseUrl}?parameters=${parameters}&community=RE&longitude=${location.lng}&latitude=${location.lat}&start=${formatDate(startDate)}&end=${formatDate(endDate)}&format=JSON&header=true`;
 
   try {
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
+    const response = await fetch(apiUrl);
     if (!response.ok) {
       const errorText = await response.text();
       console.error('NASA POWER API Error:', errorText);
@@ -148,36 +145,44 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
     fetchOpenAqData(location),
   ]);
 
-  // Helper to get an average from the last 30 days of POWER data or generate a fallback
-  const getAveragePowerValue = (param: string, fallback: () => number) => {
-    if (powerData?.properties?.parameter?.[param]) {
-      const values = Object.values(powerData.properties.parameter[param]).filter(
-        v => typeof v === 'number' && v !== powerData.header.fill_value
-      );
-      if (values.length > 0) {
-        const sum = values.reduce((a, b) => a + b, 0);
-        return parseFloat((sum / values.length).toFixed(2));
+  const getPowerValue = (param: string, dateKey: string, fallback: () => number) => {
+    if (powerData?.properties?.parameter?.[param]?.[dateKey]) {
+      const value = powerData.properties.parameter[param][dateKey];
+      if (typeof value === 'number' && value !== powerData.header.fill_value) {
+        return parseFloat(value.toFixed(2));
       }
     }
     return parseFloat(fallback().toFixed(2));
-  };
+  }
 
-  const currentTemp = getAveragePowerValue('T2M', () => 15 + Math.random() * 15);
+  const dateKeys = powerData?.header?.range ? Object.keys(powerData.properties.parameter.T2M).sort() : [];
+  const todayKey = dateKeys[dateKeys.length - 3]; // Assuming today is the 3rd from last
+  
+  const currentTemp = todayKey ? getPowerValue('T2M', todayKey, () => 15 + Math.random() * 15) : 15 + Math.random() * 15;
 
-  const forecast = [
-    { day: 'Today', temp: getAveragePowerValue('T2M_MAX', () => currentTemp + 5), condition: 'Varies' },
-    { day: 'Tomorrow', temp: getAveragePowerValue('T2M', () => currentTemp + Math.random() * 4 - 2), condition: 'Varies' },
-    { day: 'Next Day', temp: getAveragePowerValue('T2M_MIN', () => currentTemp - 5), condition: 'Varies' },
-  ];
+  const forecast = dateKeys.slice(-5).map((key, index) => {
+    const day = new Date();
+    day.setDate(day.getDate() + index - 2);
+    
+    return {
+      day: day.toLocaleDateString('en-US', { weekday: 'short' }),
+      temp: getPowerValue('T2M', key, () => currentTemp + Math.random() * 4 - 2),
+      max: getPowerValue('T2M_MAX', key, () => currentTemp + 5),
+      min: getPowerValue('T2M_MIN', key, () => currentTemp - 5),
+      condition: 'Varies',
+    }
+  });
+
+  const avgPrecip = dateKeys.length > 0 ? dateKeys.reduce((acc, key) => acc + getPowerValue('PRECTOTCORR', key, () => 0), 0) / dateKeys.length : Math.random() * 10;
   
   // Improved mock data generation for realism
-  const soilMoisture = getAveragePowerValue('PRECTOTCORR', () => Math.random() * 10) > 1 ? Math.random() * 0.5 + 0.2 : Math.random() * 0.3;
+  const soilMoisture = avgPrecip > 1 ? Math.random() * 0.5 + 0.2 : Math.random() * 0.3;
 
   return {
     airQuality: airQualityData,
     soil: {
       moisture: parseFloat(soilMoisture.toFixed(2)),
-      temperature: getAveragePowerValue('TS', () => currentTemp - 2 + Math.random() * 4),
+      temperature: todayKey ? getPowerValue('TS', todayKey, () => currentTemp - 2 + Math.random() * 4) : currentTemp - 2 + Math.random() * 4,
       ph: parseFloat((5.5 + Math.random() * 2).toFixed(2)),
       nitrogen: parseFloat((10 + soilMoisture * 40).toFixed(2)),
       phosphorus: parseFloat((5 + soilMoisture * 20).toFixed(2)),
@@ -186,7 +191,7 @@ async function fetchEnvironmentalData(location: Location): Promise<Environmental
     fire: fireData,
     water: {
       surfaceWater: parseFloat(Math.min(0.9, soilMoisture * 1.5).toFixed(2)), // Link to soil moisture
-      precipitation: getAveragePowerValue('PRECTOTCORR', () => Math.random() * 10),
+      precipitation: parseFloat(avgPrecip.toFixed(2)),
     },
     weather: {
       currentTemp: currentTemp,

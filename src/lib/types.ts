@@ -33,9 +33,17 @@ export type WaterData = {
   precipitation: number; // mm
 };
 
+export type WeatherForecast = { 
+  day: string; 
+  temp: number; 
+  min: number;
+  max: number;
+  condition: string 
+};
+
 export type WeatherData = {
   currentTemp: number;
-  forecast: { day: string; temp: number; condition: string }[];
+  forecast: WeatherForecast[];
 };
 
 export type VegetationData = {
