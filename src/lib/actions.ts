@@ -1,10 +1,6 @@
 'use server';
 
-import { getCropRecommendations } from '@/ai/flows/ai-crop-recommendations';
-import { futureTrendPredictions } from '@/ai/flows/ai-future-trend-predictions';
-import { aiRiskAssessment } from '@/ai/flows/ai-risk-assessment';
-import { getSimplifiedExplanation } from '@/ai/ai-simplified-data-explanations';
-import { aiEnvironmentalSolutions } from '@/ai/ai-environmental-solutions';
+import { aiInsightsOrchestrator } from '@/ai/flows/ai-orchestrator';
 import type { Location, EnvironmentalData, AIInsights, AirQualityData } from './types';
 
 // Constants
@@ -80,11 +76,10 @@ async function fetchNasaPowerData(location: Location): Promise<NasaPowerResponse
     'T2M', 'TS', 'T2M_MAX', 'T2M_MIN', 'PRECTOTCORR', 'WS10M'
   ].join(',');
   
-  // Fix: Correct date calculation
   const endDate = new Date();
   endDate.setDate(endDate.getDate() + 2);
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 4); // Fixed: use startDate instead of endDate
+  startDate.setDate(startDate.getDate() - 4);
 
   const apiUrl = new URL(baseUrl);
   const params = {
@@ -396,110 +391,38 @@ export async function getLocationData(
   location: Location
 ): Promise<EnvironmentalData & AIInsights> {
   try {
-    const envData = await fetchEnvironmentalData(location);
-    const locationName = location.name || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`;
-
-    // Prepare data strings for AI processing
-    const dataStrings = {
-      soil: `Moisture: ${envData.soil.moisture}, Temp: ${envData.soil.temperature}°C, pH: ${envData.soil.ph}, N: ${envData.soil.nitrogen}, P: ${envData.soil.phosphorus}, K: ${envData.soil.potassium}`,
-      weather: `Current Temp: ${envData.weather.currentTemp}°C, NDVI: ${envData.vegetation.ndvi}, Precipitation: ${envData.water.precipitation}mm`,
-      historical: `Historical data shows fluctuating temperatures and stable NDVI. Recent precipitation has been below average. Current fire risk is ${envData.fire.fireRisk}.`,
-      airQuality: `AQI: ${envData.airQuality.aqi}, PM2.5: ${envData.airQuality.pm25}`,
-      fire: `Active Fires: ${envData.fire.activeFires}, Risk: ${envData.fire.fireRisk}`,
-      water: `Precipitation: ${envData.water.precipitation}mm, Surface Water: ${(envData.water.surfaceWater * 100).toFixed(1)}%`,
-      temperature: `Current: ${envData.weather.currentTemp}°C`,
-      additionalMetrics: `Vegetation Index (NDVI): ${envData.vegetation.ndvi}`,
-    };
-
-    // Fetch AI insights in parallel with error handling
-    const aiPromises = await Promise.allSettled([
-      futureTrendPredictions({
-        location: locationName,
-        historicalData: dataStrings.historical,
-      }),
-      getCropRecommendations({
-        latitude: location.lat,
-        longitude: location.lng,
-        soilData: dataStrings.soil,
-        weatherPatterns: dataStrings.weather,
-      }),
-      aiRiskAssessment({
-        airQuality: dataStrings.airQuality,
-        fireData: dataStrings.fire,
-        waterResources: dataStrings.water,
-        weatherPatterns: dataStrings.weather,
-      }),
-      getSimplifiedExplanation({
-        location: locationName,
-        airQuality: dataStrings.airQuality,
-        soilData: dataStrings.soil,
-        fireDetection: dataStrings.fire,
-        waterResources: dataStrings.water,
-        weatherPatterns: dataStrings.weather,
-        temperature: dataStrings.temperature,
-        additionalMetrics: dataStrings.additionalMetrics,
-      }),
-      aiEnvironmentalSolutions({
-        airQuality: dataStrings.airQuality,
-        soilData: dataStrings.soil,
-        fireDetection: dataStrings.fire,
-        waterResources: dataStrings.water,
-        weatherPatterns: dataStrings.weather,
-        temperature: dataStrings.temperature,
-      }),
-    ]);
-
-    // Extract results with fallbacks
-    const [predictionsResult, recommendationsResult, riskAssessmentResult, simplifiedExplanationResult, environmentalSolutionsResult] = aiPromises.map(
-      (result, index) => {
-        if (result.status === 'fulfilled') {
-          return result.value;
-        }
-        console.error(`AI insight ${index} failed:`, result.reason);
-        // Return default values based on index
-        const defaults = [
-          { predictions: 'Unable to generate predictions at this time.' },
-          { cropRecommendations: 'Unable to generate crop recommendations at this time.' },
-          { riskAssessment: 'Unable to assess risks at this time.' },
-          { simplifiedExplanation: 'Unable to generate simplified explanation at this time.' },
-          { solutions: 'Unable to generate environmental solutions at this time.' },
-        ];
-        const defaultResult = defaults[index];
-        if ('predictions' in defaultResult) return defaultResult;
-        if ('cropRecommendations' in defaultResult) return defaultResult;
-        if ('riskAssessment' in defaultResult) return defaultResult;
-        if ('simplifiedExplanation' in defaultResult) return defaultResult;
-        if ('solutions' in defaultResult) return defaultResult;
-
-        return { value: "Error" };
-      }
-    );
-
-    const aiInsights: AIInsights = {
-      summary: `AI-generated summary for ${locationName}: Environmental conditions show ${
-        envData.airQuality.aqi < 100 ? 'good' : 'moderate'
-      } air quality with ${
-        envData.vegetation.ndvi > 0.5 ? 'healthy' : 'moderate'
-      } vegetation. Soil moisture is at ${(envData.soil.moisture * 100).toFixed(1)}% with ${
-        envData.fire.fireRisk
-      } fire risk.`,
-      futurePredictions: (predictionsResult as any).predictions,
-      cropRecommendations: (recommendationsResult as any).cropRecommendations,
-      riskAssessment: (riskAssessmentResult as any).riskAssessment,
-      simplifiedExplanation: (simplifiedExplanationResult as any).simplifiedExplanation,
-      environmentalSolutions: (environmentalSolutionsResult as any).solutions,
-    };
-
+    // Step 1: Fetch environmental data
+    const environmentalData = await fetchEnvironmentalData(location);
+    
+    // Step 2: Call the AI orchestrator with the raw data
+    const aiInsights = await aiInsightsOrchestrator({
+      location,
+      environmentalData,
+    });
+    
+    // Step 3: Combine and return
     return {
-      ...envData,
+      ...environmentalData,
       ...aiInsights,
     };
   } catch (error) {
-    console.error('Critical error in getLocationData:', error);
-    throw new Error(
-      error instanceof Error 
-        ? `Failed to fetch location data: ${error.message}`
-        : 'Failed to fetch location data due to an unknown error.'
-    );
+    console.error('Error in getLocationData:', error);
+    
+    // If there's an error, still try to return environmental data with fallback AI insights
+    try {
+      const environmentalData = await fetchEnvironmentalData(location);
+      return {
+        ...environmentalData,
+        summary: 'AI insights temporarily unavailable.',
+        futurePredictions: 'Unable to generate predictions.',
+        cropRecommendations: 'Unable to generate recommendations.',
+        riskAssessment: 'Unable to assess risks.',
+        simplifiedExplanation: 'Unable to generate explanation.',
+        environmentalSolutions: 'Unable to generate solutions.',
+      };
+    } catch (fallbackError) {
+      console.error('Critical error in getLocationData fallback:', fallbackError);
+      throw new Error('Failed to fetch any location data.');
+    }
   }
 }
