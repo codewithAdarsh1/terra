@@ -10,25 +10,28 @@ import type { Location, EnvironmentalData, AIInsights, AirQualityData } from './
 // Function to fetch data from NASA POWER API
 async function fetchNasaPowerData(location: Location) {
   const apiKey = process.env.NASA_API_KEY;
-  if (!apiKey) {
-    console.warn('NASA_API_KEY is not set. Using mock data for weather.');
+  if (!apiKey || apiKey === 'OpeoQRPT62WP5uv9Rslc6s52psCeqlmaUIOUKKZH') {
+    console.warn('NASA_API_KEY is not set or is a placeholder. Using mock data for weather.');
     return null;
   }
   const baseUrl = 'https://power.larc.nasa.gov/api/temporal/daily/point';
   const parameters = [
     'T2M', // Temperature at 2 meters
-    'RH2M', // Relative Humidity at 2 meters
-    'PRECTOTCORR', // Precipitation
-    'WS10M', // Wind Speed at 10 meters
-    'ALLSKY_SFC_SW_DWN', // All Sky Insolation Incident on a Horizontal Surface
+    'TS', // Earth Skin Temperature
     'T2M_MAX', // Max temperature
     'T2M_MIN', // Min temperature
+    'PRECTOTCORR', // Precipitation
+    'WS10M', // Wind Speed at 10 meters
   ].join(',');
+  
+  // Fetch data for the last 30 days to get a recent average
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 30);
+  
+  const formatDate = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
 
-  const startDate = '20230101';
-  const endDate = '20231231';
-
-  const apiUrl = `${baseUrl}?parameters=${parameters}&community=RE&longitude=${location.lng}&latitude=${location.lat}&start=${startDate}&end=${endDate}&format=JSON&header=true`;
+  const apiUrl = `${baseUrl}?parameters=${parameters}&community=RE&longitude=${location.lng}&latitude=${location.lat}&start=${formatDate(startDate)}&end=${formatDate(endDate)}&format=JSON`;
 
   try {
     const response = await fetch(apiUrl);
@@ -45,31 +48,29 @@ async function fetchNasaPowerData(location: Location) {
   }
 }
 
-// Function to fetch fire data from NASA FIRMS API
-async function fetchNasaFirmsData(location: Location) {
-  // FIRMS doesn't have a direct point API, but we can query a small bounding box
-  const date = new Date().toISOString().split('T')[0];
-  const worldFireUrl = `https://firms.modaps.eosdis.nasa.gov/api/country/csv/${process.env.NASA_API_KEY}/VIIRS_NOAA20_NRT/world/1/${date}`;
-
-  try {
-    // This is a simplified approach. A real implementation would use a bounding box.
-    // For now, we simulate finding nearby fires.
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return {
-      activeFires: Math.floor(Math.random() * 5),
-      fireRisk: ['low', 'medium', 'high', 'very-high'][Math.floor(Math.random() * 4)] as 'low' | 'medium' | 'high' | 'very-high',
-    };
-  } catch (error) {
-    console.error('Error fetching from NASA FIRMS API:', error);
-    return { activeFires: 0, fireRisk: 'low' };
+// Function to simulate fetching fire data
+async function fetchFireData(location: Location) {
+  // NASA FIRMS API is complex for direct real-time point queries.
+  // We'll simulate this based on location and some randomness.
+  await new Promise(resolve => setTimeout(resolve, 200)); 
+  const isDryRegion = location.lat < 40 && location.lat > -40;
+  const fireRiskLevels = ['low', 'medium', 'high', 'very-high'] as const;
+  let riskIndex = Math.floor(Math.random() * 2); // low to medium
+  if (isDryRegion) {
+    riskIndex = Math.floor(Math.random() * 3) + 1; // medium to very-high
   }
+  return {
+    activeFires: Math.floor(Math.random() * (riskIndex + 1) * 2),
+    fireRisk: fireRiskLevels[riskIndex],
+  };
 }
+
 
 // Function to fetch Air Quality data from OpenAQ
 async function fetchOpenAqData(location: Location): Promise<AirQualityData> {
   const baseUrl = 'https://api.openaq.org/v2/latest';
-  const radius = 10000; // 10km radius
-  const apiUrl = `${baseUrl}?coordinates=${location.lat},${location.lng}&radius=${radius}&order_by=distance`;
+  const radius = 50000; // 50km radius to increase chance of finding a sensor
+  const apiUrl = `${baseUrl}?coordinates=${location.lat},${location.lng}&radius=${radius}&order_by=distance&limit=1`;
 
   try {
     const response = await fetch(apiUrl, {
@@ -77,9 +78,13 @@ async function fetchOpenAqData(location: Location): Promise<AirQualityData> {
         'accept': 'application/json'
       }
     });
+
     if (!response.ok) {
-      throw new Error(`OpenAQ API request failed with status ${response.status}`);
+      const errorText = await response.text();
+      console.error('OpenAQ API Error:', errorText);
+      throw new Error(`OpenAQ API request failed: ${response.statusText}`);
     }
+
     const data = await response.json();
 
     if (data.results && data.results.length > 0) {
@@ -92,13 +97,13 @@ async function fetchOpenAqData(location: Location): Promise<AirQualityData> {
       const pm25 = getMeasurementValue('pm25');
       // Simple AQI calculation based on PM2.5 (based on EPA standards)
       const calculateAqi = (pm25: number) => {
-        if (pm25 > 350.5) return 401 + (pm25 - 350.5) * (99 / 149.9);
-        if (pm25 > 250.5) return 301 + (pm25 - 250.5) * (99 / 99.9);
-        if (pm25 > 150.5) return 201 + (pm25 - 150.5) * (99 / 99.9);
-        if (pm25 > 55.5) return 151 + (pm25 - 55.5) * (49 / 94.9);
-        if (pm25 > 35.5) return 101 + (pm25 - 35.5) * (49 / 19.9);
-        if (pm25 > 12.1) return 51 + (pm25 - 12.1) * (49 / 23.3);
-        return (pm25 / 12) * 50;
+        if (pm25 > 250.4) return 301 + (pm25 - 250.4) * (199 / 249);
+        if (pm25 > 150.4) return 201 + (pm25 - 150.4) * (99 / 99);
+        if (pm25 > 55.4) return 151 + (pm25 - 55.4) * (49 / 94);
+        if (pm25 > 35.4) return 101 + (pm25 - 35.4) * (49 / 19);
+        if (pm25 > 12.0) return 51 + (pm25 - 12.0) * (49 / 23.4);
+        if (pm25 >= 0) return Math.round((pm25 / 12.0) * 50);
+        return 0;
       };
 
       return {
@@ -115,11 +120,13 @@ async function fetchOpenAqData(location: Location): Promise<AirQualityData> {
     console.error('Error fetching from OpenAQ API:', error);
   }
 
-  // Fallback to mock data
+  // Fallback to mock data if API fails or returns no results
+  const randomAqi = Math.floor(Math.random() * 200);
+  console.warn('OpenAQ returned no data. Using mock Air Quality data.');
   return {
-    aqi: Math.floor(Math.random() * 200),
-    pm25: parseFloat((Math.random() * 50).toFixed(2)),
-    pm10: parseFloat((Math.random() * 80).toFixed(2)),
+    aqi: randomAqi,
+    pm25: parseFloat((randomAqi / 4).toFixed(2)),
+    pm10: parseFloat((randomAqi / 2).toFixed(2)),
     o3: parseFloat((Math.random() * 120).toFixed(2)),
     no2: parseFloat((Math.random() * 40).toFixed(2)),
     so2: parseFloat((Math.random() * 20).toFixed(2)),
@@ -130,58 +137,62 @@ async function fetchOpenAqData(location: Location): Promise<AirQualityData> {
 
 // Function to simulate fetching data from various sources
 async function fetchEnvironmentalData(location: Location): Promise<EnvironmentalData> {
-  await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay for other sources
-  
+  // Use Promise.all to fetch data concurrently
   const [powerData, fireData, airQualityData] = await Promise.all([
     fetchNasaPowerData(location),
-    fetchNasaFirmsData(location),
+    fetchFireData(location),
     fetchOpenAqData(location),
   ]);
 
-  const now = new Date();
-
-  // Helper to get latest value from POWER data or generate random
-  const getLatestPowerValue = (param: string, fallback: () => number) => {
-    if (powerData && powerData.properties.parameter[param]) {
-      const values = Object.values(powerData.properties.parameter[param]);
-      const lastValue = values[values.length - 1];
-      if (typeof lastValue === 'number' && lastValue !== powerData.header.fill_value) {
-        return lastValue;
+  // Helper to get an average from the last 30 days of POWER data or generate a fallback
+  const getAveragePowerValue = (param: string, fallback: () => number) => {
+    if (powerData?.properties?.parameter?.[param]) {
+      const values = Object.values(powerData.properties.parameter[param]).filter(
+        v => typeof v === 'number' && v !== powerData.header.fill_value
+      );
+      if (values.length > 0) {
+        const sum = values.reduce((a, b) => a + b, 0);
+        return parseFloat((sum / values.length).toFixed(2));
       }
     }
-    return fallback();
+    return parseFloat(fallback().toFixed(2));
   };
 
-  const currentTemp = getLatestPowerValue('T2M', () => 15 + Math.random() * 15);
+  const currentTemp = getAveragePowerValue('T2M', () => 15 + Math.random() * 15);
+
   const forecast = [
-    { day: 'Mon', temp: getLatestPowerValue('T2M_MAX', () => 15 + Math.random() * 15), condition: 'Sunny' },
-    { day: 'Tue', temp: getLatestPowerValue('T2M_MAX', () => 15 + Math.random() * 15), condition: 'Cloudy' },
-    { day: 'Wed', temp: getLatestPowerValue('T2M_MIN', () => 15 + Math.random() * 15), condition: 'Rainy' },
+    { day: 'Today', temp: getAveragePowerValue('T2M_MAX', () => currentTemp + 5), condition: 'Varies' },
+    { day: 'Tomorrow', temp: getAveragePowerValue('T2M', () => currentTemp + Math.random() * 4 - 2), condition: 'Varies' },
+    { day: 'Next Day', temp: getAveragePowerValue('T2M_MIN', () => currentTemp - 5), condition: 'Varies' },
   ];
+  
+  // Improved mock data generation for realism
+  const soilMoisture = getAveragePowerValue('PRECTOTCORR', () => Math.random() * 10) > 1 ? Math.random() * 0.5 + 0.2 : Math.random() * 0.3;
 
   return {
     airQuality: airQualityData,
     soil: {
-      moisture: parseFloat(Math.random().toFixed(2)),
-      temperature: getLatestPowerValue('T2M', () => 10 + Math.random() * 20),
+      moisture: parseFloat(soilMoisture.toFixed(2)),
+      temperature: getAveragePowerValue('TS', () => currentTemp - 2 + Math.random() * 4),
       ph: parseFloat((5.5 + Math.random() * 2).toFixed(2)),
-      nitrogen: parseFloat((10 + Math.random() * 20).toFixed(2)),
-      phosphorus: parseFloat((5 + Math.random() * 15).toFixed(2)),
-      potassium: parseFloat((20 + Math.random() * 30).toFixed(2)),
+      nitrogen: parseFloat((10 + soilMoisture * 40).toFixed(2)),
+      phosphorus: parseFloat((5 + soilMoisture * 20).toFixed(2)),
+      potassium: parseFloat((20 + soilMoisture * 50).toFixed(2)),
     },
     fire: fireData,
     water: {
-      surfaceWater: parseFloat(Math.random().toFixed(2)),
-      precipitation: getLatestPowerValue('PRECTOTCORR', () => Math.random() * 10),
+      surfaceWater: parseFloat(Math.min(0.9, soilMoisture * 1.5).toFixed(2)), // Link to soil moisture
+      precipitation: getAveragePowerValue('PRECTOTCORR', () => Math.random() * 10),
     },
     weather: {
       currentTemp: currentTemp,
       forecast: forecast,
     },
     vegetation: {
-      ndvi: parseFloat((Math.random() * 0.8 + 0.1).toFixed(2)),
+      // Simulate NDVI based on precipitation and temperature
+      ndvi: parseFloat(Math.min(0.9, Math.max(0.1, (soilMoisture * 1.2) - (currentTemp > 30 ? 0.2 : 0))).toFixed(2)),
     },
-    lastUpdated: now.toISOString(),
+    lastUpdated: new Date().toISOString(),
   };
 }
 
