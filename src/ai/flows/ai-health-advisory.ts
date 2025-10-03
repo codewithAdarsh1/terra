@@ -32,5 +32,8 @@ const prompt = ai.definePrompt({
 
 export async function healthAdvisory(environmentalData: EnvironmentalData): Promise<HealthAdvisoryOutput> {
     const {output} = await prompt(environmentalData);
-    return output!;
+    if (!output) {
+      throw new Error("Failed to get health advisory from AI");
+    }
+    return output;
 }
