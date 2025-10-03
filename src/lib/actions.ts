@@ -79,7 +79,7 @@ async function fetchNasaPowerData(location: Location): Promise<NasaPowerResponse
   const endDate = new Date();
   endDate.setDate(endDate.getDate() + 2);
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 4);
+  startDate.setDate(endDate.getDate() - 6);
 
   const apiUrl = new URL(baseUrl);
   const params = {
@@ -386,7 +386,7 @@ export async function geocodeLocation(locationName: string): Promise<Location | 
   return null;
 }
 
-// Main export function with improved error handling
+// Main export function - now much simpler!
 export async function getLocationData(
   location: Location
 ): Promise<EnvironmentalData & AIInsights> {
