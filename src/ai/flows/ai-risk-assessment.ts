@@ -30,6 +30,7 @@ export async function aiRiskAssessment(input: AIRiskAssessmentInput): Promise<AI
 
 const prompt = ai.definePrompt({
   name: 'aiRiskAssessmentPrompt',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: AIRiskAssessmentInputSchema},
   output: {schema: AIRiskAssessmentOutputSchema},
   prompt: `You are an AI assistant that specializes in environmental risk assessment using data from NASA's Terra satellite.

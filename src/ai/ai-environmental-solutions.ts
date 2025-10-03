@@ -32,6 +32,7 @@ export async function aiEnvironmentalSolutions(input: AIEnvironmentalSolutionsIn
 
 const prompt = ai.definePrompt({
   name: 'aiEnvironmentalSolutionsPrompt',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: AIEnvironmentalSolutionsInputSchema},
   output: {schema: AIEnvironmentalSolutionsOutputSchema},
   prompt: `You are an AI assistant that suggests actionable environmental solutions based on the analyzed satellite data for a location.

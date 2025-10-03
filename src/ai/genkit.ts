@@ -5,5 +5,4 @@ export const ai = genkit({
   plugins: [googleAI({
     apiVersion: 'v1beta'
   })],
-  model: 'googleai/gemini-1.5-pro-latest',
 });

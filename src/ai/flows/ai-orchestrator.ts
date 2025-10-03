@@ -354,7 +354,7 @@ const orchestratorFlow = ai.defineFlow(
         environmentalSolutions: 'Solution system is currently offline.',
         healthAdvisory: 'Health advisory system is currently offline.',
         metadata: {
-          generatedAt: new Date().toISOString(),
+          generatedAt: new DatetoISOString(),
           processingTimeMs: processingTime,
           dataQuality,
           cacheable: false,

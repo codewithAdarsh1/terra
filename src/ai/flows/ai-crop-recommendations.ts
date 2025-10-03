@@ -29,6 +29,7 @@ export async function getCropRecommendations(input: CropRecommendationsInput): P
 
 const prompt = ai.definePrompt({
   name: 'cropRecommendationsPrompt',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: CropRecommendationsInputSchema},
   output: {schema: CropRecommendationsOutputSchema},
   prompt: `You are an expert agricultural advisor. Based on the provided soil data and weather patterns for a specific location, you will provide crop recommendations.

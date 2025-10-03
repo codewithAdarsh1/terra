@@ -28,6 +28,7 @@ export async function futureTrendPredictions(input: FutureTrendPredictionsInput)
 
 const prompt = ai.definePrompt({
   name: 'futureTrendPredictionsPrompt',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: FutureTrendPredictionsInputSchema},
   output: {schema: FutureTrendPredictionsOutputSchema},
   prompt: `You are an AI assistant specialized in predicting future environmental trends based on historical data.

@@ -29,6 +29,7 @@ export async function healthAdvisory(input: HealthAdvisoryInput): Promise<Health
 
 const prompt = ai.definePrompt({
   name: 'healthAdvisoryPrompt',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: HealthAdvisoryInputSchema},
   output: {schema: HealthAdvisoryOutputSchema},
   prompt: `You are a public health expert providing advice based on environmental data from NASA satellites.
