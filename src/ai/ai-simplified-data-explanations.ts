@@ -34,22 +34,10 @@ const simplifiedExplanationPrompt = ai.definePrompt({
   `,
 });
 
-// Define the Genkit flow
-const simplifiedExplanationFlow = ai.defineFlow(
-  {
-    name: 'simplifiedExplanationFlow',
-    inputSchema: z.any(),
-    outputSchema: SimplifiedExplanationOutputSchema,
-  },
-  async (environmentalData) => {
-    const {output} = await simplifiedExplanationPrompt(environmentalData);
-    return output!;
-  }
-);
-
 /**
  * Generates a simplified explanation of environmental data for a given location.
  */
 export async function getSimplifiedExplanation(input: EnvironmentalData): Promise<SimplifiedExplanationOutput> {
-  return simplifiedExplanationFlow(input);
+    const {output} = await simplifiedExplanationPrompt(input);
+    return output!;
 }

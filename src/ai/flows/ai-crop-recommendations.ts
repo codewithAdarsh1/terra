@@ -12,10 +12,6 @@ const CropRecommendationsOutputSchema = z.object({
 });
 export type CropRecommendationsOutput = z.infer<typeof CropRecommendationsOutputSchema>;
 
-export async function getCropRecommendations(environmentalData: EnvironmentalData): Promise<CropRecommendationsOutput> {
-  return cropRecommendationsFlow(environmentalData);
-}
-
 const prompt = ai.definePrompt({
   name: 'cropRecommendationsPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
@@ -38,14 +34,8 @@ Provide a detailed explanation of why you are recommending these crops, includin
 `,
 });
 
-const cropRecommendationsFlow = ai.defineFlow(
-  {
-    name: 'cropRecommendationsFlow',
-    inputSchema: z.any(),
-    outputSchema: CropRecommendationsOutputSchema,
-  },
-  async (environmentalData) => {
+
+export async function getCropRecommendations(environmentalData: EnvironmentalData): Promise<CropRecommendationsOutput> {
     const {output} = await prompt(environmentalData);
     return output!;
-  }
-);
+}

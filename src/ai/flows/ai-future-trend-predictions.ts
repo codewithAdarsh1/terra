@@ -13,10 +13,6 @@ const FutureTrendPredictionsOutputSchema = z.object({
 });
 export type FutureTrendPredictionsOutput = z.infer<typeof FutureTrendPredictionsOutputSchema>;
 
-export async function futureTrendPredictions(environmentalData: EnvironmentalData): Promise<FutureTrendPredictionsOutput> {
-  return futureTrendPredictionsFlow(environmentalData);
-}
-
 const prompt = ai.definePrompt({
   name: 'futureTrendPredictionsPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
@@ -44,14 +40,7 @@ const prompt = ai.definePrompt({
   `,
 });
 
-const futureTrendPredictionsFlow = ai.defineFlow(
-  {
-    name: 'futureTrendPredictionsFlow',
-    inputSchema: z.any(),
-    outputSchema: FutureTrendPredictionsOutputSchema,
-  },
-  async (environmentalData) => {
+export async function futureTrendPredictions(environmentalData: EnvironmentalData): Promise<FutureTrendPredictionsOutput> {
     const {output} = await prompt(environmentalData);
     return output!;
-  }
-);
+}

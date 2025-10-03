@@ -14,10 +14,6 @@ const AIEnvironmentalSolutionsOutputSchema = z.object({
 });
 export type AIEnvironmentalSolutionsOutput = z.infer<typeof AIEnvironmentalSolutionsOutputSchema>;
 
-export async function aiEnvironmentalSolutions(environmentalData: EnvironmentalData): Promise<AIEnvironmentalSolutionsOutput> {
-  return aiEnvironmentalSolutionsFlow(environmentalData);
-}
-
 const prompt = ai.definePrompt({
   name: 'aiEnvironmentalSolutionsPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
@@ -27,7 +23,7 @@ const prompt = ai.definePrompt({
 
   Provide clear and concise solutions for {{location.name}} based on the following data derived from NASA's Terra satellite:
 
-  - Air Quality: Aerosol Index {{airQuality.aerosolIndex}}}, CO {{airQuality.co}}
+  - Air Quality: Aerosol Index {{airQuality.aerosolIndex}}, CO {{airQuality.co}}
   - Soil Data: Moisture {{soil.moisture}}, Temp {{soil.temperature}}°C
   - Fire Detection: {{fire.activeFires}} active fires, Risk: {{fire.fireRisk}}
   - Water Resources: Precipitation {{water.precipitation}}mm
@@ -38,14 +34,7 @@ const prompt = ai.definePrompt({
   `,
 });
 
-const aiEnvironmentalSolutionsFlow = ai.defineFlow(
-  {
-    name: 'aiEnvironmentalSolutionsFlow',
-    inputSchema: z.any(),
-    outputSchema: AIEnvironmentalSolutionsOutputSchema,
-  },
-  async (environmentalData) => {
-    const {output} = await prompt(environmentalData);
-    return output!;
-  }
-);
+export async function aiEnvironmentalSolutions(environmentalData: EnvironmentalData): Promise<AIEnvironmentalSolutionsOutput> {
+  const {output} = await prompt(environmentalData);
+  return output!;
+}

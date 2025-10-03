@@ -14,10 +14,6 @@ const HealthAdvisoryOutputSchema = z.object({
 });
 export type HealthAdvisoryOutput = z.infer<typeof HealthAdvisoryOutputSchema>;
 
-export async function healthAdvisory(environmentalData: EnvironmentalData): Promise<HealthAdvisoryOutput> {
-  return healthAdvisoryFlow(environmentalData);
-}
-
 const prompt = ai.definePrompt({
   name: 'healthAdvisoryPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
@@ -34,14 +30,7 @@ const prompt = ai.definePrompt({
   Health Advisory:`,
 });
 
-const healthAdvisoryFlow = ai.defineFlow(
-  {
-    name: 'healthAdvisoryFlow',
-    inputSchema: z.any(),
-    outputSchema: HealthAdvisoryOutputSchema,
-  },
-  async (environmentalData) => {
+export async function healthAdvisory(environmentalData: EnvironmentalData): Promise<HealthAdvisoryOutput> {
     const {output} = await prompt(environmentalData);
     return output!;
-  }
-);
+}

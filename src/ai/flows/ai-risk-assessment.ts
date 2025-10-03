@@ -13,10 +13,6 @@ const AIRiskAssessmentOutputSchema = z.object({
 });
 export type AIRiskAssessmentOutput = z.infer<typeof AIRiskAssessmentOutputSchema>;
 
-export async function aiRiskAssessment(environmentalData: EnvironmentalData): Promise<AIRiskAssessmentOutput> {
-  return aiRiskAssessmentFlow(environmentalData);
-}
-
 const prompt = ai.definePrompt({
   name: 'aiRiskAssessmentPrompt',
   model: 'googleai/gemini-1.5-pro-latest',
@@ -39,14 +35,7 @@ const prompt = ai.definePrompt({
   `,
 });
 
-const aiRiskAssessmentFlow = ai.defineFlow(
-  {
-    name: 'aiRiskAssessmentFlow',
-    inputSchema: z.any(),
-    outputSchema: AIRiskAssessmentOutputSchema,
-  },
-  async (environmentalData) => {
-    const {output} = await prompt(environmentalData);
-    return output!;
-  }
-);
+export async function aiRiskAssessment(environmentalData: EnvironmentalData): Promise<AIRiskAssessmentOutput> {
+  const {output} = await prompt(environmentalData);
+  return output!;
+}
