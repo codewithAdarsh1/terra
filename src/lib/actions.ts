@@ -3,6 +3,8 @@
 import { getCropRecommendations } from '@/ai/flows/ai-crop-recommendations';
 import { futureTrendPredictions } from '@/ai/flows/ai-future-trend-predictions';
 import { aiRiskAssessment } from '@/ai/flows/ai-risk-assessment';
+import { getSimplifiedExplanation } from '@/ai/ai-simplified-data-explanations';
+import { aiEnvironmentalSolutions } from '@/ai/ai-environmental-solutions';
 import type { Location, EnvironmentalData, AIInsights, AirQualityData } from './types';
 
 // Function to fetch data from NASA POWER API
@@ -209,14 +211,24 @@ export async function getLocationData(location: Location): Promise<Environmental
   try {
     const envData = await fetchEnvironmentalData(location);
 
-    const soilDataString = `Moisture: ${envData.soil.moisture}, Temp: ${envData.soil.temperature}°C, pH: ${envData.soil.ph}`;
+    const locationName = location.name || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`;
+    const soilDataString = `Moisture: ${envData.soil.moisture}, Temp: ${envData.soil.temperature}°C, pH: ${envData.soil.ph}, N: ${envData.soil.nitrogen}, P: ${envData.soil.phosphorus}, K: ${envData.soil.potassium}`;
     const weatherPatternsString = `Current Temp: ${envData.weather.currentTemp}°C, NDVI: ${envData.vegetation.ndvi}, Precipitation: ${envData.water.precipitation}mm`;
     const historicalDataString = `Historical data shows fluctuating temperatures and stable NDVI. Recent precipitation has been below average. Current fire risk is ${envData.fire.fireRisk}.`;
     const airQualityString = `AQI: ${envData.airQuality.aqi}, PM2.5: ${envData.airQuality.pm25}`;
+    const fireDetectionString = `Active Fires: ${envData.fire.activeFires}, Risk: ${envData.fire.fireRisk}`;
+    const waterResourcesString = `Precipitation: ${envData.water.precipitation}mm, Surface Water: ${envData.water.surfaceWater*100}%`;
+    const temperatureString = `Current: ${envData.weather.currentTemp}°C`;
 
-    const [predictionsResult, recommendationsResult, riskAssessmentResult] = await Promise.all([
+    const [
+      predictionsResult,
+      recommendationsResult,
+      riskAssessmentResult,
+      simplifiedExplanationResult,
+      environmentalSolutionsResult,
+    ] = await Promise.all([
       futureTrendPredictions({
-        location: location.name || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`,
+        location: locationName,
         historicalData: historicalDataString,
       }),
       getCropRecommendations({
@@ -231,17 +243,35 @@ export async function getLocationData(location: Location): Promise<Environmental
         waterResources: `Precipitation: ${envData.water.precipitation}mm`,
         weatherPatterns: weatherPatternsString,
       }),
+      getSimplifiedExplanation({
+        location: locationName,
+        airQuality: airQualityString,
+        soilData: soilDataString,
+        fireDetection: fireDetectionString,
+        waterResources: waterResourcesString,
+        weatherPatterns: weatherPatternsString,
+        temperature: temperatureString,
+        additionalMetrics: `Vegetation Index (NDVI): ${envData.vegetation.ndvi}`
+      }),
+      aiEnvironmentalSolutions({
+        airQuality: airQualityString,
+        soilData: soilDataString,
+        fireDetection: fireDetectionString,
+        waterResources: waterResourcesString,
+        weatherPatterns: weatherPatternsString,
+        temperature: temperatureString,
+      })
     ]);
 
     const aiInsights: AIInsights = {
       summary: `This AI-generated summary for ${
-        location.name || 'the selected area'
+        locationName
       } reveals moderate air quality and healthy vegetation. Soil conditions are generally favorable, though moisture levels are something to monitor.`,
       futurePredictions: predictionsResult.predictions,
       cropRecommendations: recommendationsResult.cropRecommendations,
-      environmentalSolutions:
-        'Based on the data, AI suggests promoting native plant species to improve biodiversity and soil health. Consider implementing rainwater harvesting systems to manage water resources more effectively, especially with predicted dry spells.',
       riskAssessment: riskAssessmentResult.riskAssessment,
+      simplifiedExplanation: simplifiedExplanationResult.simplifiedExplanation,
+      environmentalSolutions: environmentalSolutionsResult.solutions,
     };
 
     return {

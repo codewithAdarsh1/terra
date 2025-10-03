@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { BrainCircuit, Lightbulb, Tractor, ShieldAlert } from "lucide-react";
+import { BrainCircuit, Lightbulb, Tractor, ShieldAlert, BookOpen } from "lucide-react";
 import type { AIInsights } from "@/lib/types";
 
 interface AIDataDashboardProps {
@@ -18,7 +18,16 @@ export function AIDataDashboard({ data }: AIDataDashboardProps) {
       </CardHeader>
       <CardContent>
         <p className="text-muted-foreground mb-4">{data.summary}</p>
-        <Accordion type="single" collapsible className="w-full">
+        <Accordion type="single" collapsible className="w-full" defaultValue="explanation">
+          <AccordionItem value="explanation">
+            <AccordionTrigger>
+              <BookOpen className="mr-2 h-4 w-4" />
+              Simplified Explanation
+            </AccordionTrigger>
+            <AccordionContent className="prose dark:prose-invert prose-sm max-w-none">
+              {data.simplifiedExplanation}
+            </AccordionContent>
+          </AccordionItem>
           <AccordionItem value="predictions">
             <AccordionTrigger>
               <Lightbulb className="mr-2 h-4 w-4" />
